@@ -57,6 +57,14 @@ def _thumb(path):
         return None
 
 
+def _creator():
+    try:
+        from .campaign import campaign_name
+        return f"{campaign_name()} voter portal"
+    except RuntimeError:  # outside a request (scripts)
+        return "Campaign voter portal"
+
+
 def _local_now():
     return datetime.now(timezone.utc) + timedelta(hours=5)  # Maldives time
 
@@ -147,5 +155,5 @@ def build_pdf(rows, *, lang, title, subtitle, recipient, photos_dir):
         page.insert_text((28, page.rect.height - 20), note, fontsize=7.5, color=(0.4, 0.4, 0.4))
         page.insert_text((page.rect.width - 70, page.rect.height - 20), f"Page {i} / {doc.page_count}",
                          fontsize=7.5, color=(0.4, 0.4, 0.4))
-    doc.set_metadata({"title": title, "creator": "Gadhdhoo voter portal"})
+    doc.set_metadata({"title": title, "creator": _creator()})
     return doc.tobytes(garbage=3, deflate=True)

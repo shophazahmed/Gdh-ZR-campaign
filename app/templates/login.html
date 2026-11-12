@@ -6,7 +6,7 @@
 <form class="card narrow login-card" method="post" action="{{ url_for('auth.login') }}">
   <div class="login-head">
     <span class="brand-mark big">{{ icon('logo', 28) }}</span>
-    <h1>Gadhdhoo voter portal</h1>
+    <h1>{{ campaign_name() }} voter portal</h1>
     <p class="muted">Sign in to continue.</p>
   </div>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

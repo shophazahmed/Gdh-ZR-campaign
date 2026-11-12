@@ -84,6 +84,17 @@
   {% endfor %}
 </section>
 
+<form class="card form" method="post" action="{{ url_for('campaign.set_name') }}" id="name">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2>Campaign name</h2>
+  <p class="muted">Shown in the title bar, on the sign-in page, on PDF lists and on the WhatsApp picture page.
+    Keep it short, e.g. the island or the candidate's name.</p>
+  <label>Name
+    <input name="campaign_name" value="{{ campaign_name() }}" maxlength="40" required>
+  </label>
+  <button class="primary">Save name</button>
+</form>
+
 <form class="card form" method="post" action="{{ url_for('campaign.set_theme') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <h2>Portal colour</h2>

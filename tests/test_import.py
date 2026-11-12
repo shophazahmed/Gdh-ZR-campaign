@@ -84,7 +84,8 @@ def test_rejects_bad_files_and_non_admins(app):
     r = c.post("/admin/import", data={"csrf_token": token, "mode": "upsert",
                                       "files": (io.BytesIO(b"name\nx\n"), "random.csv")},
                content_type="multipart/form-data", follow_redirects=True)
-    assert re.search(r"None of the four voter files were found", r.get_data(as_text=True))
+    # Read in generic mode, but a file without ID cards must never reach the database
+    assert re.search(r"No voters with an ID card number", r.get_data(as_text=True))
 
     u = app.test_client()
     login(u, "viewer", USER_PW)

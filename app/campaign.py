@@ -71,6 +71,17 @@ def appearance():
     return value if value in APPEARANCES else "system"
 
 
+MAX_CAMPAIGN_NAME = 40
+
+
+def campaign_name():
+    """Short campaign name shown in the title bar, sign-in page and PDFs, e.g. 'Gadhdhoo'.
+
+    Admins set it under Settings; until then it comes from VOTER_PORTAL_CAMPAIGN_NAME.
+    """
+    return get_setting("campaign_name") or current_app.config.get("CAMPAIGN_NAME") or "Campaign"
+
+
 def get_setting(key, default=None):
     cache = g.setdefault("settings_cache", {})
     if key not in cache:
@@ -251,6 +262,20 @@ def toggle_view_all():
     audit.log("view_all_parties", detail={"on": session["show_all_parties"]})
     back = request.form.get("back", "")
     return redirect(back if back.startswith("/") and not back.startswith("//") else url_for("voters.search"))
+
+
+@bp.post("/name")
+@admin_required
+def set_name():
+    name = " ".join(request.form.get("campaign_name", "").split())[:MAX_CAMPAIGN_NAME]
+    if name:
+        put_setting("campaign_name", name)
+        audit.log("campaign_name", detail={"name": name}, commit=False)
+        get_db().commit()
+        flash(f"Campaign name changed to {name}.", "success")
+    else:
+        flash("Type a campaign name.", "error")
+    return redirect(url_for("campaign.settings") + "#name")
 
 
 @bp.post("/theme")

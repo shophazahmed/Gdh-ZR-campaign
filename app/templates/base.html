@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="{{ themes[theme][1]['accent'] }}">
-  <title>{% block title %}Voters{% endblock %} · Gadhdhoo voter portal</title>
+  <title>{% block title %}Voters{% endblock %} · {{ campaign_name() }} voter portal</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   {% if current_user and dhivehi_font() %}<link rel="stylesheet" href="{{ url_for('fonts.stylesheet') }}">{% endif %}
   <link rel="stylesheet" href="{{ url_for('theme.theme_css', v=theme) }}">
@@ -23,7 +23,7 @@
   <header class="topbar">
     <a class="brand" href="{{ url_for('voters.search') }}">
       <span class="brand-mark">{{ icon('logo', 18) }}</span>
-      <span>Gadhdhoo <span class="brand-sub">voters</span></span>
+      <span>{{ campaign_name() }} <span class="brand-sub">voters</span></span>
     </a>
     <nav class="topnav" aria-label="Main">
       {% if role == 'agent' %}

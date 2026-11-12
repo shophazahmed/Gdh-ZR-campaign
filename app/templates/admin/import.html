@@ -5,15 +5,23 @@
 
 <form class="card form" method="post" enctype="multipart/form-data" action="{{ url_for('imports.index') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <p>Upload the four voter files, or the whole <strong>Data files</strong> folder as one <code>.zip</code>
-     (photos included). Excel (.xlsx, .xls), .csv and PDF voter lists are read (photos printed in a PDF are taken from it); separate photos can be .jpg, .png or .webp.</p>
-  <ol class="muted">
-    <li>Gahdhdhoo.2026 — newest, with photos</li>
-    <li>gadhoo-new voters</li>
-    <li>Gadhdhoo (updated Party list MPD ) — the current MDP list: everyone on it is MDP; MDP voters missing from it become OTHER</li>
-    <li>final_cleaned_gadhdhoo_updated_party — oldest</li>
-  </ol>
-  <p class="muted small-text">A file name may have extra words after these, e.g. <code>gadhoo-new voters - sex.csv</code> or <code>gadhoo-new voters (1).csv</code>.</p>
+  <p>Upload the voter files, or the whole folder as one <code>.zip</code> (photos included).
+     Excel (.xlsx, .xls), .csv and PDF voter lists are read (photos printed in a PDF are taken from it);
+     separate photos can be .jpg, .png or .webp, named after the ID card (e.g. <code>A123456.jpg</code>).</p>
+  <p class="muted"><strong>More than one file?</strong> When the same ID card is in two files, the file whose name
+     comes first wins. Start the names with a number to set the order, newest first:
+     <code>1 voters 2026.xlsx</code>, <code>2 party list.csv</code>, <code>3 old list.xlsx</code>.</p>
+  <details class="muted">
+    <summary>Gadhdhoo file names</summary>
+    <p>If one of these Gadhdhoo files is uploaded, the four are read in this fixed order instead:</p>
+    <ol>
+      <li>Gahdhdhoo.2026 — newest, with photos</li>
+      <li>gadhoo-new voters</li>
+      <li>Gadhdhoo (updated Party list MPD ) — the current MDP list: everyone on it is MDP; MDP voters missing from it become OTHER</li>
+      <li>final_cleaned_gadhdhoo_updated_party — oldest</li>
+    </ol>
+    <p class="small-text">A file name may have extra words after these, e.g. <code>gadhoo-new voters - sex.csv</code>.</p>
+  </details>
   <label>Files or .zip (up to 300 MB in total)
     <input type="file" name="files" multiple required
            accept=".xlsx,.xlsm,.xls,.csv,.pdf,.zip,.jpg,.jpeg,.png,.webp">

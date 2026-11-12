@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Merge the Gadhdhoo voter files into one de-duplicated list and load it.
+"""Merge a campaign's voter files into one de-duplicated list and load it.
+
+Two ways to name the files:
+  * Generic (any campaign): every .xlsx/.xls/.csv in --data-dir is read. Priority follows the
+    file name, so start the names with a number: "1 newest list.xlsx" beats "2 party list.csv".
+  * Gadhdhoo: when one of the four Gadhdhoo file names below is present, those files are used
+    with their fixed priority (and the MDP-list rule), exactly as before.
 
     python scripts/ingest.py --data-dir "/path/to/Data files"            # merge + load
     python scripts/ingest.py --data-dir "/path/to/Data files" --dry-run  # report only
@@ -487,7 +493,10 @@ def merge(records, log):
                 if other is chosen or val in ("", None):
                     continue
                 check_conflict(f, nid, chosen, other, log)
-        out["sources"] = sorted({r.source for r in recs}, key=lambda s: [x[1] for x in SOURCES].index(s))
+        rank = {}
+        for r in recs:
+            rank.setdefault(r.source, r.priority)
+        out["sources"] = sorted(rank, key=rank.get)
         out["_photo_rec"] = next((r for r in recs if r.photo_blob or r.photo_ref), None)
         merged[nid] = out
     return merged
@@ -677,10 +686,29 @@ def seed_users(conn, admin_name, user_name):
     return created
 
 
+def _natural_key(path):
+    """'2 list' < '10 list': numbers in the name compare as numbers."""
+    return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", path.name.casefold())]
+
+
+def generic_sources(candidates):
+    """Any campaign: every table file is a source, highest priority first by (natural) file name."""
+    found = []
+    for priority, path in enumerate(sorted(candidates, key=_natural_key)):
+        label = clean_text(path.stem)[:60] or path.name
+        say(f"[i] {path.name} is read as source {priority + 1}")
+        found.append((priority, label, path))
+    return found
+
+
 def find_sources(data_dir, log):
     candidates = [p for p in Path(data_dir).iterdir() if p.is_file() and p.suffix.lower() in TABLE_EXTS
                   and not p.name.startswith("~$")]
     by_key = {header_key(p.stem): p for p in candidates}
+    named = [header_key(k) for k, _ in SOURCES]
+    if candidates and not any(k == n or k.startswith(n) or difflib.get_close_matches(n, [k], cutoff=0.85)
+                              for k in by_key for n in named):
+        return generic_sources(candidates)
     found, used = [], set()
     for priority, (key, label) in enumerate(SOURCES):
         k = header_key(key)
@@ -716,7 +744,7 @@ def main(argv=None, out=None):
     _local.out = out
     db_default, photos_default = default_paths()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--data-dir", required=True, help="folder holding the four voter files (and any photos)")
+    ap.add_argument("--data-dir", required=True, help="folder holding the voter files (and any photos)")
     ap.add_argument("--db", default=str(db_default), help=f"SQLite file (default {db_default})")
     ap.add_argument("--photos-dir", default=str(photos_default), help=f"where photos are stored (default {photos_default})")
     ap.add_argument("--log", default="merge_conflicts.log", help="conflict / anomaly log (default ./merge_conflicts.log)")
@@ -736,7 +764,7 @@ def main(argv=None, out=None):
     log = ConflictLog()
     sources = find_sources(data_dir, log)
     if not sources:
-        raise IngestError("None of the four voter files were found (supported: .xlsx .xlsm .xls .csv).")
+        raise IngestError("No voter files were found (supported: .xlsx .xlsm .xls .csv).")
 
     finder = PhotoFinder(data_dir)
     records, source_lines = [], []
@@ -748,6 +776,10 @@ def main(argv=None, out=None):
                             f"{stats['skipped']} skipped, {stats['sheets']} sheet(s)")
 
     merged = merge(records, log)
+    if not merged:
+        # Never let an empty merge reach the database: in replace mode it would wipe the list.
+        raise IngestError("No voters with an ID card number (e.g. A123456) were found in these files. "
+                          "Check that each file has an ID card column.")
     left_mdp = apply_mdp_list(merged, records, log)
     post_checks(merged, log)
 
@@ -759,15 +791,16 @@ def main(argv=None, out=None):
 
     with_photo = sum(1 for v in merged.values() if v["photo_path"])
     summary = [
-        f"Gadhdhoo voter merge - {datetime.now():%Y-%m-%d %H:%M}",
+        f"Voter merge - {datetime.now():%Y-%m-%d %H:%M}",
         f"Data folder: {data_dir.name}",
         "Sources (highest priority first):",
         *source_lines,
         f"Rows read: {len(records)}  ->  unique voters: {len(merged)}  "
         f"(duplicates merged: {len(records) - len(merged)}); with photo: {with_photo}",
-        f"Party: {sum(1 for v in merged.values() if v['party'] == MDP_PARTY)} MDP (on the updated MDP list), "
-        f"{left_mdp} moved from MDP to {LEFT_MDP_PARTY} (not on the list)",
     ]
+    if any(label == MDP_LIST_SOURCE for _, label, _ in sources):
+        summary.append(f"Party: {sum(1 for v in merged.values() if v['party'] == MDP_PARTY)} MDP (on the updated MDP list), "
+                       f"{left_mdp} moved from MDP to {LEFT_MDP_PARTY} (not on the list)")
 
     if args.csv_out:
         with open(args.csv_out, "w", newline="", encoding="utf-8-sig") as fh:

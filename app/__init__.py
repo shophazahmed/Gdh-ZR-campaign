@@ -1,4 +1,4 @@
-"""Gadhdhoo voter portal: Flask application factory."""
+"""Campaign voter portal: Flask application factory. One instance (container) per candidate."""
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -31,6 +31,7 @@ def create_app(test_config=None):
         PHOTOS_DIR=os.environ.get("VOTER_PORTAL_PHOTOS", os.path.join(base, "photos")),
         IMPORTS_DIR=os.path.join(base, "imports"),
         CAMPAIGN_DIR=os.path.join(base, "campaign"),
+        CAMPAIGN_NAME=os.environ.get("VOTER_PORTAL_CAMPAIGN_NAME", "").strip(),
         SESSION_COOKIE_NAME="vp_session",
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
@@ -92,7 +93,7 @@ def create_app(test_config=None):
                 "confirmed_metrics": confirmed.metrics,
                 "campaign_banner": campaign.banner, "whatsapp_url": campaign.whatsapp_url,
                 "sms_url": campaign.sms_url, "viber_url": campaign.viber_url, "campaign_message": campaign.message,
-                "picture_token": campaign.picture_token, "theme_name": campaign.theme_name, "themes": campaign.THEMES,
+                "picture_token": campaign.picture_token, "theme_name": campaign.theme_name, "campaign_name": campaign.campaign_name, "themes": campaign.THEMES,
                 "appearance": campaign.appearance, "urgent_notice": announce.banner}
 
     @app.after_request

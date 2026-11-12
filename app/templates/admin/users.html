@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Users and agents{% endblock %}
+{% block content %}
+<h1>Users and agents</h1>
+
+{% macro move_select(u, label) -%}
+<label>{{ label }}
+  <select name="to">
+    <option value="">Nobody (unassigned)</option>
+    {% for p in people if p.id != u.id and p.is_active %}<option value="{{ p.id }}">{{ p.username }}{{ ' (' ~ p.role ~ ')' if p.role != 'agent' }}</option>{% endfor %}
+  </select>
+</label>
+{%- endmacro %}
+
+{% macro delete_box(u) -%}
+<details class="danger-box">
+  <summary>Delete…</summary>
+  <form method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}" class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="delete">
+    {% if u.houses or u.singles %}{{ move_select(u, 'Give their houses and voters to') }}{% endif %}
+    <label>Type <strong>{{ u.username }}</strong> to confirm
+      <input name="confirm" autocomplete="off" required>
+    </label>
+    <p class="muted small-text">Past canvassing keeps their name. This can't be undone.</p>
+    <button class="danger">Delete {{ u.username }}</button>
+  </form>
+</details>
+{%- endmacro %}
+
+<section class="card">
+  <h2>{{ icon('users') }} Agents <span class="muted">· no sign-in</span></h2>
+  <p class="muted">Canvassers you give houses and voters to. They don't sign in: you update the portal after talking to them.</p>
+  {% if agents %}
+  <ul class="person-list">
+    {% for u in agents %}
+    <li class="person {{ '' if u.is_active else 'inactive' }}">
+      <div class="person-head">
+        <span class="account-avatar">{{ u.username[:1]|upper }}</span>
+        <div class="person-main">
+          <strong>{{ u.username }}</strong>{% if not u.is_active %} <span class="badge">deactivated</span>{% endif %}
+          {% if u.role == 'user' %} <span class="badge">user</span>{% endif %}
+          <p class="muted small-text">{% if u.phone %}<a href="tel:{{ u.phone }}" class="mono">{{ u.phone }}</a> · {% endif %}{{ u.houses }} house{{ 's' if u.houses != 1 }} · {{ u.singles }} one by one{% if u.note %} · {{ u.note }}{% endif %}</p>
+        </div>
+        <a class="small-text" href="{{ url_for('canvass.my_houses', agent=u.id) }}">Dashboard ›</a>
+      </div>
+      <div class="person-actions">
+        <details>
+          <summary>Edit</summary>
+          <form method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}" class="form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="edit_agent">
+            <div class="row">
+              <label>Name <input name="name" value="{{ u.username }}" maxlength="60" required></label>
+              <label>Phone <input name="phone" type="tel" value="{{ u.phone }}" maxlength="20" inputmode="tel"></label>
+            </div>
+            <label>Note <input name="note" value="{{ u.note }}" maxlength="200" placeholder="e.g. covers the north side"></label>
+            <button class="primary">Save</button>
+          </form>
+        </details>
+        {% if u.houses or u.singles %}
+        <details>
+          <summary>Move their work</summary>
+          <form method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}" class="form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="move_work">
+            {{ move_select(u, 'Give their houses and voters to') }}
+            <button>Move</button>
+          </form>
+        </details>
+        {% endif %}
+        <form method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="toggle_active">
+          <button>{{ 'Deactivate' if u.is_active else 'Activate' }}</button>
+        </form>
+        {{ delete_box(u) }}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No agents yet.</p>
+  {% endif %}
+
+  <form class="form add-agent" method="post" action="{{ url_for('admin.create_agent') }}">
+    <h3>Add an agent</h3>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row">
+      <label>Name <input name="name" maxlength="60" required placeholder="Full name"></label>
+      <label>Phone <input name="phone" type="tel" maxlength="20" inputmode="tel" placeholder="7771234"></label>
+    </div>
+    <label>Note <span class="muted">(optional)</span> <input name="note" maxlength="200"></label>
+    <button class="primary">{{ icon('plus', 16) }} Add agent</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Sign-in accounts</h2>
+  <div class="table-wrap">
+  <table class="stack">
+    <thead><tr><th>Username</th><th>Role</th>{% if is_owner %}<th>Confirmed list</th>{% endif %}<th>Status</th><th>Last sign-in</th><th>Actions</th></tr></thead>
+    <tbody>
+    {% for u in users %}
+    {% set locked_owner = u.id == owner_id and u.id != current_user.id %}
+    <tr class="{{ '' if u.is_active else 'inactive' }}">
+      <td data-label="User">{{ u.username }}{% if u.id == current_user.id %} <span class="muted">(you)</span>{% endif %}{% if u.id == owner_id %} <span class="badge">owner</span>{% endif %}
+        {% if u.role != 'admin' %}<a class="small-text" href="{{ url_for('canvass.my_houses', agent=u.id) }}">Dashboard ›</a>
+        <span class="muted small-text">{{ u.houses }} houses · {{ u.singles }} one by one</span>{% endif %}
+        </td>
+      <td data-label="Role">
+        <form method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="set_role">
+          <select name="role" data-autosubmit {{ 'disabled' if u.id == current_user.id or locked_owner }}>
+            {% for r in ['user', 'admin'] + (['agent'] if u.role == 'agent' else []) %}<option value="{{ r }}" {{ 'selected' if u.role == r }}>{{ r }}</option>{% endfor %}
+          </select>
+          <noscript><button>Set role</button></noscript>
+        </form>
+      </td>
+      {% if is_owner %}<td data-label="Confirmed list">
+        {% if u.id != owner_id %}
+        <form method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}" class="inline cf-access">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="set_confirmed_access">
+          <select name="level" data-autosubmit>
+              {% for k, label in cf_access.items() %}<option value="{{ k }}" {{ 'selected' if (u.confirmed_access or '') == k }}>{{ label }}</option>{% endfor %}
+            </select>
+          <noscript><button>Save</button></noscript>
+        </form>
+        {% else %}<span class="muted small-text">Owner</span>{% endif %}
+      </td>{% endif %}
+      <td data-label="Status">
+        {{ 'Active' if u.is_active else 'Deactivated' }}
+        {% if u.locked_until %}<span class="badge warn">locked until {{ u.locked_until[:16] }}</span>{% endif %}
+        {% if u.must_change_password %}<span class="badge">temp password</span>{% endif %}
+      </td>
+      <td data-label="Last sign-in">{{ u.last_login_at[:16] if u.last_login_at else 'Never' }}</td>
+      <td data-label=""><div class="actions">
+        {% if not locked_owner %}
+        <details class="rename-box">
+          <summary>Rename</summary>
+          <form method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}" class="form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="rename">
+            <label>New username <input name="username" value="{{ u.username }}" required pattern="[A-Za-z0-9._\-]{3,32}" maxlength="32"></label>
+            <button>Save</button>
+          </form>
+        </details>
+        {% endif %}
+        {% if locked_owner %}<span class="muted small-text">Protected: only {{ u.username }} can change this account</span>
+        {% elif u.id != current_user.id %}
+        {% for action, label, confirm in [
+            ('toggle_active', 'Deactivate' if u.is_active else 'Activate', ''),
+            ('reset_password', 'Reset password', 'Reset the password for ' ~ u.username ~ '? Their sessions end.'),
+          ] + ([('toggle_login', 'Turn off sign-in', u.username ~ ' will be listed as an agent without sign-in. Continue?')] if u.role != 'admin' else []) %}
+        <form method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}" {% if confirm %}data-confirm="{{ confirm }}"{% endif %}>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="{{ action }}">
+          <button>{{ label }}</button>
+        </form>
+        {% endfor %}
+        {% if u.locked_until %}
+        <form method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="unlock">
+          <button>Unlock</button>
+        </form>
+        {% endif %}
+        {{ delete_box(u) }}
+        {% endif %}
+      </div></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <form class="form" method="post" action="{{ url_for('admin.create_user') }}">
+    <h3>Create a sign-in account</h3>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row">
+      <label>Username <input name="username" required pattern="[A-Za-z0-9._\-]{3,32}" maxlength="32"></label>
+      <label>Role
+        <select name="role">{% for r in roles %}<option value="{{ r }}">{{ role_labels[r] }}</option>{% endfor %}</select>
+      </label>
+    </div>
+    <label>Temporary password <span class="muted">(leave blank to generate one)</span>
+      <input name="password" type="password" minlength="10" autocomplete="new-password">
+    </label>
+    <p class="muted">They must choose a new password the first time they sign in.</p>
+    <button class="primary">Create account</button>
+  </form>
+</section>
+{% endblock %}

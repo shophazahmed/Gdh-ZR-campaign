@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_macros.html" import progress, legend, icon %}
+{% block title %}{{ agent.username }}'s voters{% endblock %}
+{% block content %}
+<div class="page-head al-head">
+  <h1>{{ agent.username }} <span class="muted">· MDP Gadhdhoo</span></h1>
+  <p class="al-stamp">For {{ agent.username }} · Do not forward · valid until {{ until }}</p>
+  <p class="muted">{{ houses|length }} house{{ 's' if houses|length != 1 }} · {{ t.total }} voters ·
+    <strong>{{ (100 * t.reached / t.total)|round|int if t.total else 0 }}% reached</strong></p>
+  {{ progress(t) }}
+  {{ legend() }}
+</div>
+<input type="search" class="wide" placeholder="Search name, house or phone…" aria-label="Search" data-filter-rows="#al-rows">
+<ul class="al-list" id="al-rows">
+  {% for house, people in houses.items() %}
+  <li class="al-house" data-filter-text="{{ house|lower }} {% for v in people %}{{ v.full_name|lower }} {{ v.full_name_dv or '' }} {{ v.phone or '' }} {% endfor %}">
+    <h2>{{ house or 'No address' }}{% if people[0].house_name_dv %} <span class="muted dv-inline" dir="rtl">{{ people[0].house_name_dv }}</span>{% endif %} <span class="muted small-text">({{ people|length }})</span></h2>
+    <ul class="al-voters">
+      {% for v in people %}
+      <li class="card al-voter">
+        {% if v.photo_path %}<img src="{{ url_for('agentlink.photo', token=token, national_id=v.national_id) }}" alt="" loading="lazy" width="56" height="56">{% else %}<span class="al-nophoto">{{ icon('user', 24) }}</span>{% endif %}
+        <div>
+          <strong>{{ v.full_name }}</strong>{% if v.deceased %} <span class="badge">deceased</span>{% endif %}
+          {% if v.full_name_dv %}<br><span class="muted" dir="rtl">{{ v.full_name_dv }}</span>{% endif %}
+          <p class="small-text">{% if v.phone %}<a href="tel:{{ v.phone }}" class="mono">{{ v.phone }}</a>{% else %}<span class="muted">No phone</span>{% endif %}
+            {% if v.location %}<span class="muted"> · {{ v.location }}</span>{% endif %}</p>
+        </div>
+        <span class="badge st-tag-{{ v.status }}">{{ statuses.get(v.status, v.status) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </li>
+  {% else %}
+  <li class="muted">No voters assigned yet.</li>
+  {% endfor %}
+</ul>
+<p class="muted small-text">Read-only. Updates from the campaign team show here as soon as they're made.</p>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_macros.html" import pager %}
+{% block title %}Activity log{% endblock %}
+{% block content %}
+<h1>Activity log</h1>
+<form class="card filters" method="get">
+  <label>Action
+    <select name="action">
+      <option value="">Any</option>
+      {% for a in actions %}<option {{ 'selected' if a == action }}>{{ a }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>User <input name="user" value="{{ username }}"></label>
+  <label>Target <input name="target" value="{{ target }}" placeholder="ID card or username"></label>
+  <div class="actions"><button class="primary">Filter</button></div>
+</form>
+<p class="muted">{{ total }} entries</p>
+<div class="table-wrap">
+<table class="audit stack">
+  <thead><tr><th>When (UTC)</th><th>User</th><th>Action</th><th>Target</th><th>Details</th><th>IP</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td data-label="When" class="mono">{{ r.at[:19].replace('T', ' ') }}</td>
+    <td data-label="User">{{ r.username or '—' }}</td>
+    <td data-label="Action"><span class="badge">{{ r.action }}</span></td>
+    <td data-label="Target" class="mono">{{ r.target or '' }}</td>
+    <td data-label="Details" class="detail">{{ r.detail or '' }}</td>
+    <td data-label="IP" class="mono">{{ r.ip or '' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{{ pager('admin.audit_log', page, pages, query_args) }}
+{% endblock %}

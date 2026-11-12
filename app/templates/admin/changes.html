@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_macros.html" import pager, icon %}
+{% block title %}Changes{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Changes</h1>
+  <p class="muted">Every change people made: status and notes, voter edits and assignments, with who and when (Maldives time).</p>
+</div>
+<form class="card filters" method="get">
+  <label>Person
+    <select name="person">
+      <option value="">Everyone</option>
+      {% for p in people %}<option value="{{ p.id }}" {{ 'selected' if args.get('person') == p.id|string }}>{{ p.username }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Type
+    <select name="type">
+      <option value="">All changes</option>
+      {% for k, label in types.items() %}<option value="{{ k }}" {{ 'selected' if args.get('type') == k }}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>From <input type="date" name="from" value="{{ args.get('from', '') }}"></label>
+  <label>To <input type="date" name="to" value="{{ args.get('to', '') }}"></label>
+  <label>Voter <input name="q" value="{{ args.get('q', '') }}" placeholder="Name, house or ID card"></label>
+  <div class="actions">
+    <button class="primary">Show</button>
+    <a class="button" href="{{ url_for('admin.changes', format='csv', **query_args) }}">{{ icon('download', 16) }} CSV</a>
+  </div>
+</form>
+<p class="muted">{{ total }} change{{ 's' if total != 1 }}</p>
+<ul class="change-list">
+  {% for r in rows %}
+  <li class="card change">
+    <p class="change-head"><strong>{{ r.username or '—' }}</strong> · <span class="badge">{{ types.get(r.action, r.action) }}</span>
+      <span class="muted small-text">{{ r.at|local }}</span></p>
+    {% if r.full_name %}<p class="change-voter"><a href="{{ url_for('voters.detail', national_id=r.target) }}">{{ r.full_name }}</a>
+      <span class="muted">· {{ r.house_name }}</span></p>{% endif %}
+    {% set what = describe(r) %}{% if what %}<p class="change-what">{{ what }}</p>{% endif %}
+  </li>
+  {% else %}
+  <li class="muted">No changes match.</li>
+  {% endfor %}
+</ul>
+{{ pager('admin.changes', page, pages, query_args) }}
+{% endblock %}

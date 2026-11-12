@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_macros.html" import progress, icon %}
+{% block title %}100% confirmed{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>100% confirmed voters</h1>
+  <p class="muted">Voters who will vote for you. {% if owner %}Only you (the <strong>{{ current_user.username }}</strong> account) and the people you give access to can see this list;{% else %}You can {{ 'see and mark' if can_mark_cf else 'see' }} this list because the administrator gave you access; it can't be downloaded;{% endif %}
+    other admins, users and agents never see it.</p>
+</div>
+
+<section class="kpis" aria-label="Confirmed">
+  <div class="kpi hero cf-hero">
+    <span class="kpi-label">Confirmed · {{ m.label }} voters</span>
+    <strong>{{ m.pct }}%</strong>
+    <span class="muted">{{ m.confirmed }} of {{ m.total }}</span>
+    {{ progress({'total': m.total, 'contacted': m.confirmed, 'reached': m.confirmed}, 'lg') }}
+  </div>
+  <div class="kpi"><span class="kpi-label">This week</span><strong>+{{ m.this_week }}</strong></div>
+  <div class="kpi"><span class="kpi-label">Still to confirm</span><strong>{{ m.total - m.confirmed }}</strong></div>
+  <div class="kpi"><span class="kpi-label">Out of all voters</span><strong>{{ m.all_pct }}%</strong>
+    <span class="muted">{{ m.all_confirmed }} of {{ m.all_total }}</span></div>
+</section>
+
+<div class="actions cf-actions">
+  <a class="button primary" href="{{ url_for('voters.search', cf='1', sort='house') }}">{{ icon('check', 18) }} See the confirmed list</a>
+  <a class="button" href="{{ url_for('voters.search', cf='0', sort='house') }}">Not confirmed yet</a>
+  {% if owner %}<a class="button" href="{{ url_for('voters.export', fmt='csv', cf='1', sort='house') }}">{{ icon('download', 16) }} CSV</a>{% endif %}
+  {% if owner %}<a class="button" href="{{ url_for('voters.export', fmt='xlsx', cf='1', sort='house') }}">{{ icon('download', 16) }} Excel</a>{% endif %}
+</div>
+
+{% if can_mark_cf %}<details class="card cf-list"{{ ' open' if not m.confirmed }}>
+  <summary><h2>Add from a list</h2></summary>
+  <form method="post" action="{{ url_for('confirmed.list_preview') }}" class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>ID card numbers, one per line (or paste a column from Excel)
+      <textarea name="ids" rows="6" placeholder="A123456&#10;A234567" spellcheck="false" autocapitalize="characters" required></textarea>
+    </label>
+    <p class="muted small-text">Nothing is saved yet: you first see who will be confirmed, who already is, and any ID card that isn't in the portal.</p>
+    <div class="actions"><button class="primary">Check the list</button></div>
+  </form>
+</details>{% endif %}
+
+{% if houses %}
+<section class="card">
+  <h2>By house</h2>
+  <input type="search" class="wide" placeholder="Filter houses…" aria-label="Filter houses" data-filter-rows="#cf-houses">
+  <ul class="house-list" id="cf-houses">
+    {% for h in houses %}
+    <li class="house-row" data-filter-text="{{ h.house|lower }}">
+      <a class="house-link" href="{{ url_for('voters.search', h=h.house, sort='house') }}">
+        <span class="house-name">{{ h.house }}</span>
+        <span class="house-meta"><span class="mono">{{ h.confirmed }}/{{ h.total }}</span></span>
+      </a>
+      {{ progress({'total': h.total, 'contacted': h.confirmed, 'reached': h.confirmed}) }}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

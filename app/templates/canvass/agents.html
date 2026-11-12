@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% from "_macros.html" import progress, legend, icon %}
+{% block title %}Agents{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Agents</h1>
+  <p class="muted">Agents are canvassers. Each sees only the voters in the houses assigned to them, plus any voter you hand them one by one
+    (open a voter and use <strong>Assigned agent</strong>, or tick voters in Search).
+    Add agents (no sign-in) under <a href="{{ url_for('admin.users') }}">Users and agents</a>; read-only users can be given houses too.</p>
+</div>
+
+{% if agents %}
+<ul class="agent-grid">
+  {% for a in agents %}
+  {% set pct = (100 * (a.reached or 0) / a.voters)|round|int if a.voters else 0 %}
+  <li class="card agent-card {{ '' if a.is_active else 'inactive' }}" id="agent-{{ a.id }}">
+    <div class="agent-top">
+      <span class="account-avatar">{{ a.username[:1]|upper }}</span>
+      <div>
+        <strong>{{ a.username }}</strong>{% if not a.is_active %} <span class="badge">deactivated</span>{% endif %}
+        <p class="muted small-text">{{ a.houses }} house{{ 's' if a.houses != 1 }} · {{ a.voters }} voters ·
+          {% if a.singles %}<a href="{{ url_for('voters.search', va=a.id) }}">+{{ a.singles }} one by one</a> ·{% endif %}
+          {{ weekly.get(a.id, 0) }} update{{ 's' if weekly.get(a.id, 0) != 1 }} this week</p>
+      </div>
+      <strong class="agent-pct">{{ pct }}%</strong>
+    </div>
+    {{ progress(a) }}
+    <p class="small-text agent-foot">
+      <span class="muted">{% if a.role == 'user' %}User · {% endif %}{% if not a.can_login %}{% if a.phone %}<a href="tel:{{ a.phone }}" class="mono">{{ a.phone }}</a>{% else %}No sign-in{% endif %}{% else %}Last sign-in {{ a.last_login_at[:16].replace('T', ' ') if a.last_login_at else 'never' }}{% endif %}</span>
+      <a href="{{ url_for('canvass.my_houses', agent=a.id) }}">Open their dashboard ›</a>
+    </p>
+    <p class="small-text agent-pdf">
+      <a class="button small" href="{{ url_for('voters.export_pdf', ag=a.id) }}" data-share-pdf>{{ icon('download', 16) }} PDF</a>
+      <a class="button small" href="{{ url_for('voters.export_pdf', ag=a.id, lang='dv') }}" data-share-pdf>{{ icon('download', 16) }} PDF ދިވެހި</a>
+      <a href="{{ url_for('voters.search', ag=a.id, sort='house') }}">See their voters ›</a>
+    </p>
+    {% if is_owner and a.voters %}
+    <p class="small-text agent-pdf">
+      <a class="button small wa-list" href="{{ url_for('share.whatsapp_list', ag=a.id) }}" target="_blank" rel="noopener">{{ icon('chat', 16) }} WhatsApp list</a>
+      <a class="button small wa-list" href="{{ url_for('share.whatsapp_list', ag=a.id, lang='dv') }}" target="_blank" rel="noopener">{{ icon('chat', 16) }} WhatsApp ދިވެހި</a>
+      {% if not a.phone %}<span class="muted">No number saved: you pick the chat</span>{% endif %}
+    </p>
+    {% endif %}
+    {% if is_owner %}
+    {% set link = links.get(a.id) %}
+    <div class="agent-link small-text">
+      {% if link %}
+      <p><strong>Dashboard link</strong> · valid until {{ link.expires_at|local }} ·
+        opened {{ link.opens }} time{{ 's' if link.opens != 1 }}{% if link.last_open_at %}, last {{ link.last_open_at|local }}{% endif %}</p>
+      <div class="agent-link-btns">
+        <a class="button small primary" href="{{ link_wa(link, a) }}" target="_blank" rel="noopener">{{ icon('chat', 16) }} Send link on WhatsApp</a>
+        <button type="button" class="small" data-copy="{{ link_url(link) }}">Copy link</button>
+        <form method="post" action="{{ url_for('agentlink.create', agent_id=a.id) }}" data-confirm="Make a new link? The old one stops working.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="days" value="7">
+          <button class="small">New link</button>
+        </form>
+        <form method="post" action="{{ url_for('agentlink.stop', agent_id=a.id) }}" data-confirm="Stop this link now?">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="small danger">Stop link</button>
+        </form>
+      </div>
+      {% else %}
+      <form class="agent-link-btns" method="post" action="{{ url_for('agentlink.create', agent_id=a.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="small">{{ icon('send', 16) }} Share dashboard link</button>
+        <label class="muted">valid for <select name="days" aria-label="Link valid for">{% for d in link_days %}<option value="{{ d }}">{{ d }} days</option>{% endfor %}</select></label>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+
+<form class="card form" method="post" action="{{ url_for('canvass.auto_assign') }}"
+      data-confirm="Assign houses automatically?">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2>{{ icon('users') }} Auto-assign houses</h2>
+  <p class="muted">Shares out the houses so every agent gets a similar amount of work left: voters not yet
+    reached plus follow-ups. The biggest houses are handed out first, each to the agent with the least work so far.</p>
+  <fieldset class="checks">
+    <legend>Agents to include</legend>
+    {% for a in agents if a.is_active %}
+    <label class="check"><input type="checkbox" name="agents" value="{{ a.id }}" {{ 'checked' if a.role == 'agent' }}> {{ a.username }}{{ ' (' ~ a.role ~ ')' if a.role != 'agent' }}</label>
+    {% endfor %}
+  </fieldset>
+  <label>Which houses
+    <select name="scope">
+      <option value="unassigned">Only the {{ unassigned }} unassigned house{{ 's' if unassigned != 1 }}</option>
+      <option value="all">Re-balance all houses (replaces current assignments)</option>
+    </select>
+  </label>
+  <button class="primary">Auto-assign</button>
+</form>
+
+<details class="card danger-box unassign-all">
+  <summary>Unassign everyone…</summary>
+  <form method="post" action="{{ url_for('canvass.unassign_all') }}" class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <p class="muted">Takes every house and every one-by-one voter away from everyone, so all voters are
+      <strong>Unassigned</strong>. Canvassing status, notes and history stay. This can't be undone.</p>
+    <label>Type <strong>UNASSIGN</strong> to confirm <input name="confirm" autocomplete="off" required></label>
+    <button class="danger">Unassign all voters</button>
+  </form>
+</details>
+{% else %}
+<div class="empty card">
+  <p><strong>No agents yet.</strong></p>
+  <p class="muted">Go to <a href="{{ url_for('admin.users') }}">Users</a>, create a user and pick the role <strong>agent</strong>.</p>
+</div>
+{% endif %}
+
+{% if houses %}
+<form class="card" method="post" action="{{ url_for('canvass.assign') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="list-head">
+    <h2>Houses ({{ houses|length }}, {{ unassigned }} unassigned)</h2>
+    <button class="primary">Save assignments</button>
+  </div>
+  <input type="search" class="wide" placeholder="Filter houses…" aria-label="Filter houses" data-filter-rows="#assign-rows">
+  {{ legend() }}
+  <ul class="assign-list" id="assign-rows">
+    {% for h in houses %}
+    <li data-filter-text="{{ h.house|lower }} {{ (h.agent or 'unassigned')|lower }}">
+      <input type="hidden" name="house" value="{{ h.house }}">
+      <div class="assign-main">
+        <span class="house-name">{{ h.house }}</span>
+        <span class="muted small-text mono">{{ h.reached }}/{{ h.total }}</span>
+        {{ progress(h, 'sm') }}
+      </div>
+      <select name="agent" aria-label="Agent for {{ h.house }}">
+        <option value="">— unassigned —</option>
+        {% for a in agents %}<option value="{{ a.id }}" {{ 'selected' if h.agent_id == a.id }}>{{ a.username }}{{ ' (inactive)' if not a.is_active }}</option>{% endfor %}
+      </select>
+    </li>
+    {% endfor %}
+  </ul>
+  <button class="primary">Save assignments</button>
+</form>
+{% endif %}
+{% endblock %}

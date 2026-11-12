@@ -1,0 +1,33 @@
+[Unit]
+Description=Gadhdhoo voter portal (Gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=voterportal
+Group=voterportal
+WorkingDirectory=/opt/voter-portal
+EnvironmentFile=/etc/voter-portal/env
+ExecStart=/opt/voter-portal/.venv/bin/gunicorn -c deploy/gunicorn.conf.py wsgi:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=3
+UMask=0077
+
+# Hardening: the app can only write to its data folder
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/voter-portal
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

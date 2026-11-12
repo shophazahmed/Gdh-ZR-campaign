@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Sign in{% endblock %}
+{% block main_class %}center login{% endblock %}
+{% block content %}
+<form class="card narrow login-card" method="post" action="{{ url_for('auth.login') }}">
+  <div class="login-head">
+    <span class="brand-mark big">{{ icon('logo', 28) }}</span>
+    <h1>Gadhdhoo voter portal</h1>
+    <p class="muted">Sign in to continue.</p>
+  </div>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label>Username
+    <input name="username" value="{{ username or '' }}" autocomplete="username" autocapitalize="none"
+           autocorrect="off" spellcheck="false" required autofocus>
+  </label>
+  <label>Password
+    <input name="password" type="password" autocomplete="current-password" required>
+  </label>
+  <button class="primary wide big">Sign in</button>
+</form>
+{% endblock %}

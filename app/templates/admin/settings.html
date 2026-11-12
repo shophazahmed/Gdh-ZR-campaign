@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Campaign settings{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Campaign settings</h1>
+  <p class="muted">Choose whose voters this campaign works with. Everyone else is hidden from users and agents
+    in search, voter pages, photos, the dashboard and My houses.</p>
+</div>
+
+<form class="card form" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2>Show voters of these parties</h2>
+  <fieldset class="checks party-checks">
+    <legend class="sr-only">Parties</legend>
+    {% for party, n in options %}
+    <label class="check party-option">
+      <input type="checkbox" name="parties" value="{{ party }}" {{ 'checked' if party in current }}>
+      <span><strong>{{ 'No party recorded' if party == '(none)' else party }}</strong>
+        <span class="muted">{{ n }} voter{{ 's' if n != 1 }}</span></span>
+    </label>
+    {% endfor %}
+  </fieldset>
+  <div class="actions">
+    <button class="primary" name="mode" value="selected">Save</button>
+    {% if current %}<button name="mode" value="all" data-confirm-click="Show every party's voters to everyone again?">Show all parties</button>{% endif %}
+  </div>
+  {% if current %}
+  <p class="flash flash-info">Now showing <strong>{{ current|join(', ')|replace('(none)', 'No party') }}</strong> only;
+    {{ hidden }} other voter{{ 's' if hidden != 1 }} hidden.</p>
+  {% else %}
+  <p class="muted">Right now every party is shown. Tick <strong>MDP</strong> and save to show MDP members only.</p>
+  {% endif %}
+</form>
+
+<section class="card" id="messages">
+  <h2>Messages</h2>
+  <p class="muted">The <strong>WhatsApp</strong>, <strong>SMS</strong> and <strong>Viber</strong> buttons on each voter start a
+    message with this text. The canvasser can still change it before sending. Placeholders: <code>{first_name}</code>,
+    <code>{name}</code>, <code>{house}</code>, <code>{id}</code>.</p>
+
+  {% for key, label in channels.items() %}
+  <form class="form msg-form" method="post" id="msg-{{ key }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="form" value="{{ key }}">
+    <h3>{{ label }}{% if key != 'whatsapp' and not own_template[key] %} <span class="badge">same as WhatsApp</span>{% endif %}</h3>
+    {% if key == 'sms' %}<p class="muted small-text">Keep it short: one SMS holds about 160 characters; longer ones are sent as several.</p>{% endif %}
+    {% if key == 'viber' %}<p class="muted small-text">Viber can't fill in text for a number, so the Viber button copies this message first.
+      The canvasser pastes it into the chat (long-press → Paste). The voter must use Viber on that number.</p>{% endif %}
+    <label>{{ label }} message
+      <textarea name="template" rows="4" maxlength="600">{{ templates[key] }}</textarea>
+    </label>
+    {% if key == 'whatsapp' %}
+    <label class="check"><input type="checkbox" name="picture_link" value="1" {{ 'checked' if picture_link }}>
+      Add the picture link at the end (WhatsApp shows the picture as a preview)</label>
+    {% endif %}
+    <button class="primary">Save {{ label }} message</button>
+  </form>
+  {% if key == 'whatsapp' %}
+  <div class="picture-box">
+    <h3>WhatsApp picture</h3>
+    {% if picture %}
+    <img class="picture-preview" src="{{ url_for('picture.image', token=picture) }}" alt="Current campaign picture">
+    <p class="muted small-text">Anyone with the link can open this picture (no sign-in), so it can show in WhatsApp.
+      Don't upload anything private. Uploading a new picture gives it a new link.</p>
+    {% else %}
+    <p class="muted small-text">No picture yet. Upload a flyer or poster (JPEG, PNG or WebP, up to 8 MB).</p>
+    {% endif %}
+    <form class="form" method="post" action="{{ url_for('campaign.upload_picture') }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>{{ 'Replace picture' if picture else 'Picture' }}
+        <input type="file" name="picture" accept="image/jpeg,image/png,image/webp" required>
+      </label>
+      <button class="primary">Upload picture</button>
+    </form>
+    {% if picture %}
+    <form method="post" action="{{ url_for('campaign.upload_picture') }}" data-confirm="Remove the campaign picture?">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="remove" value="1">
+      <button class="danger small">Remove picture</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endfor %}
+</section>
+
+<form class="card form" method="post" action="{{ url_for('campaign.set_theme') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2>Portal colour</h2>
+  <p class="muted">The main colour for everyone. Each person can still choose light or dark mode from their account menu.</p>
+  <div class="swatches">
+    {% for key, (label, light, dark) in themes.items() %}
+    <label class="swatch">
+      <input type="radio" name="theme" value="{{ key }}" {{ 'checked' if key == theme }}>
+      <span class="swatch-chip sw-{{ key }}" aria-hidden="true"></span>
+      <span>{{ label }}</span>
+    </label>
+    {% endfor %}
+  </div>
+  <button class="primary">Save colour</button>
+</form>
+
+<section class="card" id="font">
+  <h2>Dhivehi font</h2>
+  {% set dvfont = dhivehi_font() %}
+  <p class="muted">Used for Dhivehi (Thaana) text in PDF lists, WhatsApp voter cards and the portal's pages. English stays in the normal font.
+    Now: <strong>{{ dhivehi_font_name() or 'Noto Sans Thaana (built in)' }}</strong>.</p>
+  {% if dvfont %}<p class="thaana dv-sample" lang="dv">ސާމްޕަލް ވޯޓަރ · ޓެސްޓް ހައުސް</p>{% endif %}
+  <form method="post" action="{{ url_for('fonts.upload') }}" enctype="multipart/form-data" class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Font file (.ttf or .otf, a Unicode Thaana font such as MV Faseyha or Faruma)
+      <input type="file" name="font" accept=".ttf,.otf" required>
+    </label>
+    <p class="muted small-text">Stored privately on the server (not in the code). Only upload a font you're allowed to use.</p>
+    <button class="primary">Upload font</button>
+  </form>
+  {% if dvfont %}
+  <form method="post" action="{{ url_for('fonts.upload') }}" data-confirm="Go back to Noto Sans Thaana?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="remove" value="1">
+    <button>Use the built-in font again</button>
+  </form>
+  {% endif %}
+</section>
+
+<div class="card">
+  <h2>How it works</h2>
+  <ul class="muted">
+    <li>Hidden voters are not deleted. Imports keep updating them, and they appear automatically if their
+      party changes to one you show (for example, when they join the MDP list).</li>
+    <li>Admins see the campaign view too, and can tap <strong>Show all parties</strong> in the banner
+      to look someone up. That only changes the view for the admin who taps it, and it's logged.</li>
+    <li>Houses with no voters in the campaign drop off the dashboard and the assignment lists.</li>
+  </ul>
+</div>
+{% endblock %}

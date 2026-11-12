@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Import voters{% endblock %}
+{% block content %}
+<h1>Import voters</h1>
+
+<form class="card form" method="post" enctype="multipart/form-data" action="{{ url_for('imports.index') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p>Upload the four voter files, or the whole <strong>Data files</strong> folder as one <code>.zip</code>
+     (photos included). Excel (.xlsx, .xls), .csv and PDF voter lists are read (photos printed in a PDF are taken from it); separate photos can be .jpg, .png or .webp.</p>
+  <ol class="muted">
+    <li>Gahdhdhoo.2026 — newest, with photos</li>
+    <li>gadhoo-new voters</li>
+    <li>Gadhdhoo (updated Party list MPD ) — the current MDP list: everyone on it is MDP; MDP voters missing from it become OTHER</li>
+    <li>final_cleaned_gadhdhoo_updated_party — oldest</li>
+  </ol>
+  <p class="muted small-text">A file name may have extra words after these, e.g. <code>gadhoo-new voters - sex.csv</code> or <code>gadhoo-new voters (1).csv</code>.</p>
+  <label>Files or .zip (up to 300 MB in total)
+    <input type="file" name="files" multiple required
+           accept=".xlsx,.xlsm,.xls,.csv,.pdf,.zip,.jpg,.jpeg,.png,.webp">
+  </label>
+  <label>When an ID is already in the portal
+    <select name="mode">
+      <option value="upsert">Add new voters and update imported ones; keep voters edited in the portal</option>
+      <option value="replace">Replace the whole voter list with these files</option>
+    </select>
+  </label>
+  <p class="muted">Nothing changes yet: you first get a preview with the conflict log and a merged list to check.</p>
+  <button class="primary" {{ 'disabled' if running }}>Upload and preview</button>
+  {% if running %}<p class="muted">An import is running. <a href="{{ url_for('imports.job', job_id=running.id) }}">See it</a>.</p>{% endif %}
+</form>
+
+{% if jobs %}
+<h2>Recent imports</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Started (UTC)</th><th>By</th><th>Type</th><th>Mode</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for j in jobs %}
+  <tr>
+    <td class="mono">{{ j.created_at[:16].replace('T', ' ') }}</td>
+    <td>{{ j.username }}</td>
+    <td>{{ 'Preview' if j.dry_run else 'Import' }}</td>
+    <td>{{ j.mode }}</td>
+    <td><span class="badge {{ 'warn' if j.status == 'failed' }}">{{ j.status }}</span>{% if j.applied_by %} <span class="badge">applied</span>{% endif %}</td>
+    <td><a href="{{ url_for('imports.job', job_id=j.id) }}">Open</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

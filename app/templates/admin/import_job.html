@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Import preview' if j.dry_run else 'Import' }}{% endblock %}
+{% block head %}{% if j.status == 'running' %}<meta http-equiv="refresh" content="3">{% endif %}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('imports.index') }}">‹ Imports</a></p>
+<div class="card">
+  <h1>{{ 'Import preview' if j.dry_run else 'Import' }}
+    <span class="badge {{ 'warn' if j.status == 'failed' }}">{{ j.status }}</span></h1>
+  <p class="muted">Started {{ j.created_at[:19].replace('T', ' ') }} UTC by {{ j.username }} · mode: {{ j.mode }}
+    {% if j.finished_at %} · finished {{ j.finished_at[11:19] }}{% endif %}</p>
+
+  {% if j.status == 'running' %}
+    <p>Reading and merging the files… this page refreshes by itself.</p>
+  {% endif %}
+
+  {% if j.output %}<pre class="output">{{ j.output }}</pre>{% endif %}
+
+  <div class="actions">
+    {% if has_log %}<a class="button" href="{{ url_for('imports.download', job_id=j.id, kind='log') }}">Download conflict log</a>{% endif %}
+    {% if has_csv %}<a class="button" href="{{ url_for('imports.download', job_id=j.id, kind='csv') }}">Download merged list (CSV)</a>{% endif %}
+  </div>
+
+  {% if can_apply %}
+  <form class="form apply" method="post" action="{{ url_for('imports.apply', job_id=j.id) }}"
+        data-confirm="{{ 'Replace the whole voter list with these files?' if j.mode == 'replace' else 'Load these voters into the portal?' }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2>Happy with the preview?</h2>
+    {% if j.mode == 'replace' %}
+    <label>Type REPLACE to wipe the current list and load these files
+      <input name="confirm" autocomplete="off" required pattern="REPLACE">
+    </label>
+    {% endif %}
+    <button class="primary">Apply import</button>
+  </form>
+  {% elif j.dry_run and j.applied_by %}
+  <p><a href="{{ url_for('imports.job', job_id=j.applied_by) }}">This preview was applied — see the import</a>.</p>
+  {% elif j.dry_run and j.status == 'done' %}
+  <p class="muted">The uploaded files were removed (previews keep them for 24 hours). Upload them again to import.</p>
+  {% endif %}
+  {% if not j.dry_run and j.status == 'done' %}
+  <p><a class="button primary" href="{{ url_for('voters.search') }}">Go to voter search</a></p>
+  {% endif %}
+</div>
+
+{% if log_head %}
+<details class="card" {{ 'open' if j.dry_run }}>
+  <summary><strong>Conflict log</strong> <span class="muted">(first 400 lines; download for the full file)</span></summary>
+  <pre class="output">{{ log_head }}</pre>
+</details>
+{% endif %}
+
+<details class="card">
+  <summary>Uploaded files ({{ files|length }})</summary>
+  <ul class="mono">{% for f in files[:200] %}<li>{{ f }}</li>{% endfor %}</ul>
+  {% if files|length > 200 %}<p class="muted">…and {{ files|length - 200 }} more</p>{% endif %}
+</details>
+{% endblock %}

@@ -1,0 +1,138 @@
+{% from "_macros.html" import icon %}
+<!doctype html>
+{% set look = appearance() %}{% set theme = theme_name() %}
+<html lang="en"{% if look != 'system' %} data-theme="{{ look }}"{% endif %}>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="{{ themes[theme][1]['accent'] }}">
+  <title>{% block title %}Voters{% endblock %} · Gadhdhoo voter portal</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% if current_user and dhivehi_font() %}<link rel="stylesheet" href="{{ url_for('fonts.stylesheet') }}">{% endif %}
+  <link rel="stylesheet" href="{{ url_for('theme.theme_css', v=theme) }}">
+  <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.svg') }}">
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  {% block head %}{% endblock %}
+</head>
+{% set role = current_user.role if current_user else '' %}
+<body class="{{ 'has-tabbar' if current_user }}">
+  {% if current_user %}
+  {% set ep = request.endpoint or '' %}
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('voters.search') }}">
+      <span class="brand-mark">{{ icon('logo', 18) }}</span>
+      <span>Gadhdhoo <span class="brand-sub">voters</span></span>
+    </a>
+    <nav class="topnav" aria-label="Main">
+      {% if role == 'agent' %}
+      <a href="{{ url_for('canvass.my_houses') }}" {{ 'aria-current=page' if ep == 'canvass.my_houses' }}>My dashboard</a>
+      {% endif %}
+      <a href="{{ url_for('voters.search') }}" {{ 'aria-current=page' if ep.startswith('voters.') and ep != 'voters.create' }}>Search</a>
+      {% if role == 'user' %}
+      <a href="{{ url_for('canvass.my_houses') }}" {{ 'aria-current=page' if ep == 'canvass.my_houses' }}>My dashboard</a>
+      {% elif role == 'admin' %}
+      <a href="{{ url_for('canvass.dashboard') }}" {{ 'aria-current=page' if ep == 'canvass.dashboard' }}>Dashboard</a>
+      {% endif %}
+      {% if is_admin %}
+      <a href="{{ url_for('canvass.agents') }}" {{ 'aria-current=page' if ep == 'canvass.agents' or (ep == 'canvass.my_houses') }}>Agents</a>
+      <a href="{{ url_for('imports.index') }}" {{ 'aria-current=page' if ep.startswith('imports.') }}>Import</a>
+      <a href="{{ url_for('admin.users') }}" {{ 'aria-current=page' if ep.startswith('admin.user') }}>Users</a>
+      <a href="{{ url_for('campaign.settings') }}" {{ 'aria-current=page' if ep == 'campaign.settings' }}>Settings</a>
+      {% endif %}
+      {% if can_view_cf %}
+      <a href="{{ url_for('confirmed.overview') }}" {{ 'aria-current=page' if ep == 'confirmed.overview' }}>Confirmed</a>
+      {% endif %}
+    </nav>
+    <details class="account">
+      <summary aria-label="Account">
+        <span class="account-avatar">{{ current_user.username[:1]|upper }}</span>
+        <span class="account-name">{{ current_user.username }}</span>
+      </summary>
+      <div class="account-menu">
+        <p><strong>{{ current_user.username }}</strong><br><span class="muted">{{ {'admin': 'Admin', 'agent': 'Agent (canvasser)', 'user': 'Read-only user'}[role] }}</span></p>
+        {% if is_admin %}
+        <a href="{{ url_for('voters.create') }}">Add a voter</a>
+        <a href="{{ url_for('admin.changes') }}">Changes</a>
+        <a href="{{ url_for('admin.audit_log') }}">Activity log</a>
+        <a href="{{ url_for('campaign.settings') }}">Campaign settings</a>
+        {% endif %}
+        <a href="{{ url_for('announce.index') }}">Announcements</a>
+        {% if can_view_cf %}<a href="{{ url_for('confirmed.overview') }}">100% confirmed voters</a>{% endif %}
+        <form class="appearance" method="post" action="{{ url_for('theme.set_appearance') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="back" value="{{ request.full_path.rstrip('?') }}">
+          <span class="muted small-text">Appearance</span>
+          <div class="appearance-btns">
+            {% for key, label in [('system', 'Auto'), ('light', 'Light'), ('dark', 'Dark')] %}
+            <button name="appearance" value="{{ key }}" class="small {{ 'on' if look == key }}" aria-pressed="{{ 'true' if look == key else 'false' }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+        </form>
+        <a href="{{ url_for('auth.change_password') }}">Change password</a>
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="link">Sign out</button>
+        </form>
+      </div>
+    </details>
+  </header>
+  {% endif %}
+
+  <main class="{% block main_class %}page{% endblock %}">
+    {% set cb = campaign_banner() if current_user else none %}
+    {% if cb %}
+    <form class="campaign-banner {{ 'all' if cb.all }}" method="post" action="{{ url_for('campaign.toggle_view_all') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="back" value="{{ request.full_path.rstrip('?') }}">
+      {% if cb.all %}
+      <span>Showing <strong>all parties</strong> (only you). Other users see {{ cb.label }} only.</span>
+      <button class="small">Back to {{ cb.label }} only</button>
+      {% else %}
+      <span>Campaign view: <strong>{{ cb.label }}</strong> voters only</span>
+      <button class="small">Show all parties</button>
+      {% endif %}
+    </form>
+    {% endif %}
+    {% set un = urgent_notice() if current_user else none %}
+    {% if un %}
+    <form class="urgent-banner" method="post" action="{{ url_for('announce.mark_seen', aid=un.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="back" value="{{ request.full_path.rstrip('?') }}">
+      <span class="urgent-icon">{{ icon('megaphone', 20) }}</span>
+      <div class="urgent-body">
+        <strong>Urgent · {{ un.created_by_name or 'Admin' }}</strong> <span class="small-text">{{ un.created_at|local }}</span>
+        <p dir="auto">{{ un.text }}</p>
+      </div>
+      <button class="small">Seen</button>
+    </form>
+    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}" role="status">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% if current_user %}
+  <nav class="tabbar" aria-label="Main">
+    {% if role == 'agent' %}
+    <a href="{{ url_for('canvass.my_houses') }}" {{ 'aria-current=page' if ep == 'canvass.my_houses' }}>{{ icon('home') }}<span>My dashboard</span></a>
+    {% endif %}
+    <a href="{{ url_for('voters.search') }}" {{ 'aria-current=page' if ep.startswith('voters.') }}>{{ icon('search') }}<span>Search</span></a>
+    {% if role == 'user' %}
+    <a href="{{ url_for('canvass.my_houses') }}" {{ 'aria-current=page' if ep == 'canvass.my_houses' }}>{{ icon('chart') }}<span>My dashboard</span></a>
+    {% elif role == 'admin' %}
+    <a href="{{ url_for('canvass.dashboard') }}" {{ 'aria-current=page' if ep == 'canvass.dashboard' }}>{{ icon('chart') }}<span>Dashboard</span></a>
+    {% endif %}
+    {% if is_admin %}
+    <a href="{{ url_for('canvass.agents') }}" {{ 'aria-current=page' if ep in ('canvass.agents', 'canvass.my_houses') }}>{{ icon('users') }}<span>Agents</span></a>
+    <a href="{{ url_for('imports.index') }}" {{ 'aria-current=page' if ep.startswith('imports.') }}>{{ icon('upload') }}<span>Import</span></a>
+    <a href="{{ url_for('admin.users') }}" {{ 'aria-current=page' if ep.startswith('admin.') }}>{{ icon('user') }}<span>Users</span></a>
+    {% endif %}
+  </nav>
+  {% endif %}
+</body>
+</html>

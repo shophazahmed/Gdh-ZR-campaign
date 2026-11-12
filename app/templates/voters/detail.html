@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, sex_label, icon %}
+{% from "share/_panel.html" import share_panel with context %}
+{% block title %}{{ v.full_name }}{% endblock %}
+{% block content %}
+<a class="backlink" href="{{ back.split('#')[0] }}#v-{{ v.national_id }}">{{ icon('back', 18) }} Back to results</a>
+
+<article class="card profile">
+  <div class="profile-head">
+    {{ avatar(v, 'lg') }}
+    <div>
+      <h1>{{ v.full_name or '(no name)' }}</h1>
+      <p class="vcard-tags">
+        <span class="tag mono">{{ v.national_id }}</span>
+        {% if v.deceased %}<span class="tag deceased">Deceased</span>{% endif %}
+        {% if v.party %}<span class="tag party">{{ v.party }}</span>{% endif %}
+      </p>
+    </div>
+  </div>
+
+  {% if v.phone and not v.deceased %}
+  <div class="contact-wide">
+    <a class="button primary big" href="tel:{{ v.phone }}">{{ icon('phone') }} Call {{ v.phone }}</a>
+    {% set wa = whatsapp_url(v) %}{% set sms = sms_url(v) %}{% set vb = viber_url(v) %}
+    {% if wa %}<a class="button big wa-wide" href="{{ wa }}" target="_blank" rel="noopener noreferrer">{{ icon('chat') }} WhatsApp</a>{% endif %}
+    {% if sms %}<a class="button big sms-wide" href="{{ sms }}">{{ icon('sms') }} SMS</a>{% endif %}
+    {% if vb %}<a class="button big viber-wide" href="{{ vb }}" data-copy="{{ campaign_message(v, 'viber') }}">{{ icon('viber') }} Viber</a>{% endif %}
+    {% if wa and picture_token() %}<button type="button" class="button big" hidden
+        data-share-picture="{{ url_for('picture.image', token=picture_token()) }}"
+        data-share-text="{{ campaign_message(v, 'whatsapp') }}">{{ icon('image') }} Send picture</button>{% endif %}
+  </div>
+  {% endif %}
+
+  <form class="canvass" method="post" action="{{ url_for('voters.canvass', national_id=v.national_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="back" value="{{ request.full_path.rstrip('?') }}">
+    <fieldset class="segmented">
+      <legend>{{ 'Canvassing status' if everyone else 'Your status' }}</legend>
+      {% for key, label in statuses.items() %}
+      <label class="seg st-{{ key }}"><input type="radio" name="status" value="{{ key }}" {{ 'checked' if v.status == key }}><span>{{ label }}</span></label>
+      {% endfor %}
+    </fieldset>
+    <label>Add a note
+      <textarea name="note" rows="3" maxlength="2000" placeholder="What did they say? Needs a lift on voting day? Best time to visit?"></textarea>
+    </label>
+    <div class="canvass-foot">
+      <button class="primary">Save</button>
+      {% if v.status_at %}<span class="muted small-text">{{ 'Latest' if everyone else 'Your status set' }} {{ v.status_at|local }}{% if everyone and status_user %} by {{ status_user.username }}{% endif %}</span>{% endif %}
+    </div>
+    {% if not everyone %}<p class="muted small-text">Only you (and the admins) see your status and notes.</p>{% endif %}
+  </form>
+
+  {% if people %}
+  <section class="everyone">
+    <h2 class="small-head">Everyone's status</h2>
+    <ul class="timeline">
+      {% for c in people %}<li><strong>{{ c.username }}</strong> · <span class="tag st-tag-{{ c.status }}">{{ statuses[c.status] }}</span> <span class="muted small-text">{{ c.status_at|local }}</span></li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if notes %}
+  <section class="notes-list">
+    <h2 class="small-head">{{ 'Notes' if everyone else 'Your notes' }}</h2>
+    <ul class="timeline">
+      {% for n in notes %}
+      <li>
+        <p class="note-meta small-text"><strong>{{ n.username or 'Earlier note' }}</strong> · {{ n.at|local }}
+          {% if n.user_id == current_user.id or is_admin %}
+          <form class="inline" method="post" action="{{ url_for('voters.delete_note', national_id=v.national_id, note_id=n.id) }}" data-confirm="Delete this note?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="back" value="{{ request.full_path.rstrip('?') }}">
+            <button class="linklike">Delete</button>
+          </form>
+          {% endif %}</p>
+        <p class="note-text">{{ n.text }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if is_owner %}{{ share_panel(v.national_id) }}{% endif %}
+
+  {% if can_mark_cf %}
+  <form class="confirm-box {{ 'on' if confirmation }}" method="post" action="{{ url_for('confirmed.set_confirmed', national_id=v.national_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="back" value="{{ request.full_path.rstrip('?') }}">
+    <p class="confirm-head"><strong>{{ icon('check', 18) }} {{ '100% confirmed' if confirmation else 'Not confirmed yet' }}</strong>
+      {% if confirmation %}<span class="muted small-text">since {{ confirmation.confirmed_at|local }} · private</span>
+      {% else %}<span class="muted small-text">Private: only people you give access see this</span>{% endif %}</p>
+    <label>Private note <span class="muted">(optional)</span>
+      <input name="note" maxlength="300" value="{{ confirmation.note if confirmation }}" placeholder="e.g. needs transport on voting day">
+    </label>
+    <div class="actions">
+      {% if confirmation %}
+      <button class="primary" name="confirmed" value="1">Save note</button>
+      <button name="confirmed" value="0">Remove confirmation</button>
+      {% else %}
+      <button class="primary" name="confirmed" value="1">{{ icon('check', 18) }} Mark 100% confirmed</button>
+      {% endif %}
+    </div>
+  </form>
+  {% elif can_view_cf %}
+  <p class="confirm-box {{ 'on' if confirmation }}"><strong>{{ icon('check', 18) }} {{ '100% confirmed' if confirmation else 'Not confirmed yet' }}</strong>
+    {% if confirmation %}<span class="muted small-text">since {{ confirmation.confirmed_at|local }}{% if confirmation.note %} · {{ confirmation.note }}{% endif %}</span>{% endif %}</p>
+  {% endif %}
+
+  {% if is_admin %}
+  <form class="assign-one" method="post" action="{{ url_for('voters.assign', national_id=v.national_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <label>Assigned agent
+      <select name="agent" data-autosubmit>
+        <option value="">{% if house_agent %}House agent ({{ house_agent.username }}){% else %}— nobody (house has no agent) —{% endif %}</option>
+        {% for a in agents %}
+        <option value="{{ a.id }}" {{ 'selected' if assigned and assigned.id == a.id }}>{{ a.username }}{{ ' (deactivated)' if not a.is_active }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <noscript><button>Save</button></noscript>
+    <p class="muted small-text">{% if assigned %}Handed to <strong>{{ assigned.username }}</strong> one by one{% if house_agent and house_agent.id != assigned.id %}; {{ house_agent.username }} (house agent) no longer sees this voter{% endif %}.{% elif house_agent %}{{ house_agent.username }} has this voter through the house.{% else %}No agent sees this voter yet.{% endif %}</p>
+  </form>
+  {% endif %}
+
+  <dl class="facts">
+    <div><dt>House</dt><dd>{{ v.house_name or '—' }}</dd></div>
+    <div><dt>Age</dt><dd>{{ v.age if v.age is not none else '—' }}</dd></div>
+    <div><dt>Sex</dt><dd>{{ sex_label(v.sex) }}</dd></div>
+    <div><dt>Party</dt><dd>{{ v.party or '—' }}</dd></div>
+    <div><dt>Location</dt><dd>{{ v.location or '—' }}</dd></div>
+    {% if v.full_name_dv or v.house_name_dv %}<div><dt>Dhivehi</dt><dd class="thaana" lang="dv" dir="rtl">{{ v.full_name_dv }}{% if v.house_name_dv %} · {{ v.house_name_dv }}{% endif %}</dd></div>{% endif %}
+    <div><dt>Phone</dt><dd class="mono">{% if v.phone %}<a href="tel:{{ v.phone }}">{{ v.phone }}</a>{% else %}—{% endif %}</dd></div>
+    <div><dt>ID card</dt><dd class="mono">{{ v.national_id }}</dd></div>
+    {% if not is_admin and current_user.role == 'user' %}
+    <div><dt>Agent</dt><dd>{{ assigned.username if assigned else (house_agent.username if house_agent else '—') }}</dd></div>
+    {% endif %}
+    {% if is_admin %}
+    <div class="wide"><dt>Source</dt><dd>{{ v.source }}</dd></div>
+    <div class="wide"><dt>Last changed</dt><dd>{{ v.updated_at|local }}{% if editor %} by {{ editor.username }}{% endif %}</dd></div>
+    {% endif %}
+  </dl>
+
+  {% if is_admin %}
+  <div class="actions split">
+    <a class="button primary" href="{{ url_for('voters.edit', national_id=v.national_id) }}">{{ icon('edit', 18) }} Edit voter</a>
+    <form method="post" action="{{ url_for('voters.delete', national_id=v.national_id) }}"
+          data-confirm="Delete {{ v.full_name }} ({{ v.national_id }})? This can't be undone.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="danger">{{ icon('trash', 18) }} Delete voter</button>
+    </form>
+  </div>
+  {% endif %}
+</article>
+
+{% if v.house_name %}
+<section class="housemates">
+  <div class="list-head">
+    <h2>Also at {{ v.house_name }}</h2>
+    {% if housemates %}<a href="{{ url_for('voters.search', h=v.house_name, sort='house') }}">Open as list ›</a>{% endif %}
+  </div>
+  {% if housemates %}
+  <ul class="mate-list">
+    {% for m in housemates %}
+    <li class="mate st-{{ m.status }}">
+      <a href="{{ url_for('voters.detail', national_id=m.national_id, back=back) }}">
+        {{ avatar(m, 'sm') }}
+        <span class="mate-main">
+          <strong>{{ m.full_name or '(no name)' }}</strong>
+          <span class="muted small-text">{% if m.age is not none %}{{ m.age }} · {% endif %}{{ m.sex or '—' }}{% if m.phone %} · <span class="mono">{{ m.phone }}</span>{% endif %}</span>
+        </span>
+        {% if can_view_cf and m.confirmed %}<span class="tag cf-tag">{{ icon('check', 12) }} confirmed</span>{% endif %}
+        <span class="tag st-tag-{{ m.status }}">{{ statuses[m.status] }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">Nobody else {{ 'you can see ' if current_user.role != 'admin' }}is registered at this address.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

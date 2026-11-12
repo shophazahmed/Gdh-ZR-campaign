@@ -1,0 +1,34 @@
+# Option B: run behind the shared Traefik that already holds 80/443 on the VPS
+# (Hostinger Docker Manager: entrypoint "websecure", cert resolver "letsencrypt").
+#
+#   cp .env.example .env    # set VOTER_PORTAL_SECRET_KEY, chmod 600 .env
+#   docker compose up -d --build
+services:
+  voter-portal:
+    build: .
+    container_name: voter-portal
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      VOTER_PORTAL_DATA_DIR: /data
+      GUNICORN_BIND: 0.0.0.0:8000
+      FORWARDED_ALLOW_IPS: "*"   # only Traefik can reach the container
+    volumes:
+      - voter-data:/data
+    networks: [web]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=voter-portal_web"
+      - "traefik.http.routers.voter-portal.rule=Host(`vote.seenu.online`)"
+      - "traefik.http.routers.voter-portal.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.voter-portal.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.services.voter-portal.loadbalancer.server.port=8000"
+      - "traefik.http.middlewares.voter-portal-hsts.headers.stsSeconds=31536000"
+      - "traefik.http.routers.voter-portal.middlewares=voter-portal-hsts"
+
+volumes:
+  voter-data:
+
+networks:
+  web:
+    name: voter-portal_web

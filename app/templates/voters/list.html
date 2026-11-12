@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% from "_macros.html" import pager, avatar, icon %}
+{% from "share/_panel.html" import share_panel with context %}
+{% block content %}
+<form class="searchbar" method="get" action="{{ url_for('voters.search') }}" role="search">
+  <div class="search-input">
+    {{ icon('search') }}
+    <input type="search" name="q" value="{{ f.q }}" placeholder="Name, ID, house, phone"
+           aria-label="Search name, ID, house or phone" autocomplete="off" enterkeyhint="search">
+    {% for k in ('national_id', 'house', 'h', 'party', 'loc', 'dc', 'sex', 'age_min', 'age_max', 'status', 'va', 'ag', 'by', 'cf', 'sort', 'n') %}
+      {% if query_args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ query_args[k] }}">{% endif %}
+    {% endfor %}
+    <button class="primary" type="submit">Search</button>
+  </div>
+</form>
+
+<div class="chips" aria-label="Quick filters">
+  <a class="chip {{ 'on' if not f.party }}" href="{{ url_for('voters.search', **dict(query_args, party='')) }}">All</a>
+  {% for p in parties %}
+  <a class="chip {{ 'on' if f.party == p }}" href="{{ url_for('voters.search', **dict(query_args, party=p)) }}">{{ p }}</a>
+  {% endfor %}
+</div>
+
+<div class="chips status-chips" aria-label="Canvassing status">
+  <a class="chip {{ 'on' if not f.status }}" href="{{ url_for('voters.search', **dict(query_args, status='')) }}">Everyone <b>{{ status_counts.all }}</b></a>
+  {% for key, label in statuses.items() %}
+  <a class="chip st-{{ key }} {{ 'on' if f.status == key }}" href="{{ url_for('voters.search', **dict(query_args, status=key)) }}">{{ label }} <b data-count="{{ key }}">{{ status_counts[key] }}</b></a>
+  {% endfor %}
+</div>
+
+<details class="filter-panel card">
+  <summary>{{ icon('filter') }} More filters &amp; sort
+    {% set n = chips|length %}{% if n %}<span class="count">{{ n }}</span>{% endif %}</summary>
+  <form class="filters" method="get" action="{{ url_for('voters.search') }}">
+    <input type="hidden" name="q" value="{{ f.q }}">
+    {% if f.status %}<input type="hidden" name="status" value="{{ f.status }}">{% endif %}
+    {% if f.h %}<input type="hidden" name="h" value="{{ f.h }}">{% endif %}
+    {% if f.va %}<input type="hidden" name="va" value="{{ f.va }}">{% endif %}
+    <label>National ID
+      <input name="national_id" value="{{ f.national_id }}" placeholder="A123456" maxlength="20" autocapitalize="characters">
+    </label>
+    <input type="hidden" name="n" value="{{ size }}">
+    <label>House name
+      <input name="house" value="{{ f.house }}" list="houses" maxlength="100">
+      <datalist id="houses">{% for h in houses %}<option value="{{ h }}">{% endfor %}</datalist>
+    </label>
+    <label>Party
+      <select name="party">
+        <option value="">Any</option>
+        {% for p in parties %}<option {{ 'selected' if f.party == p }}>{{ p }}</option>{% endfor %}
+        <option value="(none)" {{ 'selected' if f.party == '(none)' }}>No party</option>
+      </select>
+    </label>
+    <label>Location (where they vote)
+      <select name="loc">
+        <option value="">Any</option>
+        {% for l in locations %}<option {{ 'selected' if f.loc == l }}>{{ l }}</option>{% endfor %}
+        <option value="(none)" {{ 'selected' if f.loc == '(none)' }}>No location</option>
+      </select>
+    </label>
+    <label>Sex
+      <select name="sex">
+        <option value="">Any</option>
+        <option value="M" {{ 'selected' if f.sex == 'M' }}>Male</option>
+        <option value="F" {{ 'selected' if f.sex == 'F' }}>Female</option>
+        <option value="unknown" {{ 'selected' if f.sex == 'unknown' }}>Not recorded</option>
+      </select>
+    </label>
+    <label>Age
+      <span class="range">
+        <input type="number" inputmode="numeric" name="age_min" min="0" max="130" value="{{ f.age_min if f.age_min is not none }}" placeholder="from" aria-label="Age from">
+        <span class="muted">–</span>
+        <input type="number" inputmode="numeric" name="age_max" min="0" max="130" value="{{ f.age_max if f.age_max is not none }}" placeholder="to" aria-label="Age to">
+      </span>
+    </label>
+    <label>Deceased
+      <select name="dc">
+        <option value="">Show everyone</option>
+        <option value="0" {{ 'selected' if f.dc == '0' }}>Hide deceased</option>
+        <option value="1" {{ 'selected' if f.dc == '1' }}>Deceased only</option>
+      </select>
+    </label>
+    {% if can_view_cf %}
+    <label>100% confirmed
+      <select name="cf">
+        <option value="">Any</option>
+        <option value="1" {{ 'selected' if f.cf == '1' }}>Confirmed</option>
+        <option value="0" {{ 'selected' if f.cf == '0' }}>Not confirmed</option>
+      </select>
+    </label>
+    {% endif %}
+    {% if contacted_by %}
+    <label>Contacted by
+      <select name="by">
+        <option value="">Anyone</option>
+        {% for u in contacted_by %}<option value="{{ u.id }}" {{ 'selected' if f.by == u.id|string }}>{{ u.username }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    {% if agent_options %}
+    <label>Agent
+      <select name="ag">
+        <option value="">Any</option>
+        {% for a in agent_options %}<option value="{{ a.id }}" {{ 'selected' if f.ag == a.id|string }}>{{ a.username }}{{ ' (deactivated)' if not a.is_active }}</option>{% endfor %}
+        <option value="none" {{ 'selected' if f.ag == 'none' }}>No agent</option>
+      </select>
+    </label>
+    {% endif %}
+    <label>Sort by
+      <select name="sort">
+        {% for key, label in [('name','Name'),('house','House'),('location','Location'),('age','Age'),('party','Party'),('id','ID')] %}
+        <option value="{{ key }}" {{ 'selected' if f.sort == key }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="actions">
+      <button class="primary">Apply filters</button>
+      {% if filtered %}<a class="button" href="{{ url_for('voters.search') }}">Clear all</a>{% endif %}
+    </div>
+  </form>
+</details>
+
+{% if chips %}
+<div class="active-filters">
+  {% for label, url in chips %}
+  <a class="chip removable" href="{{ url }}" aria-label="Remove filter {{ label }}">{{ label }} {{ icon('x', 14) }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="resultbar">
+  <p><strong>{{ total }}</strong> {{ 'voter' if total == 1 else 'voters' }}{{ ' match' if filtered else ' in total' }}
+    {% if not filtered and stats %}<span class="muted"> · {{ stats.male or 0 }} male · {{ stats.female or 0 }} female</span>{% endif %}
+    {% if pages > 1 %}<span class="muted"> · showing {{ first }}–{{ last }}</span>{% endif %}</p>
+  {% if is_admin and total and (is_owner or not f.cf) %}
+  <div class="export">
+    <a class="button small" href="{{ url_for('voters.export', fmt='csv', **query_args) }}">{{ icon('download', 16) }} CSV</a>
+    <a class="button small" href="{{ url_for('voters.export', fmt='xlsx', **query_args) }}">{{ icon('download', 16) }} Excel</a>
+    <a class="button small" href="{{ url_for('voters.export_pdf', **query_args) }}" data-share-pdf>{{ icon('download', 16) }} PDF</a>
+    <a class="button small" href="{{ url_for('voters.export_pdf', lang='dv', **query_args) }}" data-share-pdf>{{ icon('download', 16) }} PDF ދިވެހި</a>
+    {% if is_owner and not f.cf %}
+    <a class="button small wa-list" href="{{ url_for('share.whatsapp_list', **query_args) }}" target="_blank" rel="noopener">{{ icon('chat', 16) }} WhatsApp list</a>
+    <a class="button small wa-list" href="{{ url_for('share.whatsapp_list', lang='dv', **query_args) }}" target="_blank" rel="noopener">{{ icon('chat', 16) }} WhatsApp ދިވެހި</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if is_admin and rows and agents %}
+<details class="filter-panel card bulk-assign">
+  <summary>{{ icon('users') }} Assign voters</summary>
+  <form id="bulk-assign" class="filters" method="post" action="{{ url_for('voters.assign_bulk') }}"
+        data-confirm="Assign these voters?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="back" value="{{ back_url }}">
+    {% for k, val in query_args.items() if k != 'sort' %}<input type="hidden" name="{{ k }}" value="{{ val }}">{% endfor %}
+    <p class="muted small-text wide-row">Filter the list (location, status, house, <a href="{{ url_for('voters.search', **dict(query_args, ag='none')) }}">unassigned only</a>…),
+      then tick voters below or use every voter that matches. They go to that person even if their house belongs to someone else.</p>
+    <p class="wide-row pick-tools" hidden data-pick-tools>
+      <button type="button" class="button small" data-pick="page">Tick all on this page</button>
+      <button type="button" class="button small" data-pick="none">Clear</button>
+      <span class="muted small-text"><strong data-pick-count>0</strong> ticked</span>
+    </p>
+    <label>Which voters
+      <select name="scope">
+        <option value="selected">Only the ones I tick below</option>
+        <option value="all">All {{ total }} matching voter{{ 's' if total != 1 }}</option>
+      </select>
+    </label>
+    <label>Give them to
+      <select name="agent">
+        <optgroup label="Agents">{% for a in agents if a.is_active and a.role == 'agent' %}<option value="{{ a.id }}">{{ a.username }}</option>{% endfor %}</optgroup>
+        {% for role, label in [('user', 'Users'), ('admin', 'Admins')] if agents|selectattr('role', 'equalto', role)|list %}<optgroup label="{{ label }}">{% for a in agents if a.is_active and a.role == role %}<option value="{{ a.id }}">{{ a.username }}{{ ' (you)' if a.id == current_user.id }}</option>{% endfor %}</optgroup>{% endfor %}
+        <option value="">— back to their house's person —</option>
+      </select>
+    </label>
+    <div class="actions"><button class="primary">Assign</button></div>
+  </form>
+</details>
+{% endif %}
+
+{% if is_owner and rows and agents %}{{ share_panel() }}{% endif %}
+
+{% if rows %}
+<ul class="voter-list">
+  {% for v in rows %}
+  {% if f.sort == 'house' and loop.changed(v.house_name) %}
+  <li class="house-head"><h2>{{ v.house_name or 'No house' }}</h2></li>
+  {% endif %}
+  <li class="vcard st-{{ v.status }}{{ ' deceased' if v.deceased }}" id="v-{{ v.national_id }}">
+    <div class="vcard-top">
+    {% if is_admin and agents %}<input type="checkbox" class="pick" name="ids" value="{{ v.national_id }}" form="bulk-assign" aria-label="Select {{ v.full_name }}">{% endif %}
+    {{ avatar(v, 'md') }}
+    <div class="vcard-main">
+      <a class="vcard-name" href="{{ url_for('voters.detail', national_id=v.national_id, back=back_url) }}">{{ v.full_name or '(no name)' }}</a>
+      <p class="vcard-meta">{{ v.house_name or 'No house' }}{% if v.age is not none %} · {{ v.age }}{% endif %}{% if v.sex %} · {{ v.sex }}{% endif %}{% if v.phone %} · <span class="mono">{{ v.phone }}</span>{% endif %}</p>
+      {% if v.location %}<p class="vcard-loc">{{ icon('pin', 14) }} <span>{{ v.location }}</span></p>{% endif %}
+      <p class="vcard-tags">
+        {% if v.deceased %}<span class="tag deceased">Deceased</span>{% endif %}
+        {% if v.party %}<span class="tag party">{{ v.party }}</span>{% endif %}
+        {% if current_user.role != 'agent' %}{% if v.assigned_to %}<span class="tag agent-tag" title="{{ 'Handed over one by one' if v.one_by_one else 'Through their house' }}">{{ icon('user', 12) }} {{ v.assigned_to }}{{ '' if v.one_by_one else ' · house' }}</span>{% elif is_admin %}<span class="tag unassigned-tag">Unassigned</span>{% endif %}{% endif %}
+      </p>
+      {% if can_mark_cf %}
+      <form class="cf-form" method="post" action="{{ url_for('confirmed.set_confirmed', national_id=v.national_id) }}" data-confirm-toggle>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="back" value="{{ back_url }}#v-{{ v.national_id }}">
+        <input type="hidden" name="confirmed" value="{{ '0' if v.confirmed else '1' }}">
+        <button class="cf-btn {{ 'on' if v.confirmed }}" aria-pressed="{{ 'true' if v.confirmed else 'false' }}">{{ icon('check', 14) }} <span>{{ '100% confirmed' if v.confirmed else 'Mark confirmed' }}</span></button>
+      </form>
+      {% elif can_view_cf and v.confirmed %}<span class="tag cf-tag">{{ icon('check', 12) }} 100% confirmed</span>
+      {% endif %}
+    </div>
+    </div>
+    <form class="status-form" method="post" action="{{ url_for('voters.canvass', national_id=v.national_id) }}" data-status-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="back" value="{{ back_url }}">
+      <input type="hidden" name="from" value="list">
+      <select name="status" aria-label="Canvassing status for {{ v.full_name }}" data-status-select>
+        {% for key, label in statuses.items() %}<option value="{{ key }}" {{ 'selected' if v.status == key }}>{{ label }}</option>{% endfor %}
+      </select>
+      <noscript><button>Save</button></noscript>
+      <span class="save-state" aria-live="polite"></span>
+      {% if v.phone and not v.deceased %}
+      <span class="contact-btns">
+        {% set wa = whatsapp_url(v) %}{% set sms = sms_url(v) %}{% set vb = viber_url(v) %}
+        {% if wa %}<a class="wa" href="{{ wa }}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp {{ v.full_name }}" title="WhatsApp">{{ icon('chat', 18) }}</a>{% endif %}
+        {% if vb %}<a class="viber" href="{{ vb }}" data-copy="{{ campaign_message(v, 'viber') }}" aria-label="Viber {{ v.full_name }}" title="Viber (message copied, paste it)">{{ icon('viber', 18) }}</a>{% endif %}
+        {% if sms %}<a class="sms" href="{{ sms }}" aria-label="SMS {{ v.full_name }}" title="SMS">{{ icon('sms', 18) }}</a>{% endif %}
+        <a class="call" href="tel:{{ v.phone }}" aria-label="Call {{ v.full_name }}" title="Call">{{ icon('phone', 18) }}</a>
+      </span>
+      {% endif %}
+    </form>
+    <p class="vcard-who small-text muted" data-who>
+      {%- if v.status_by_name %}<span data-who-status>{{ statuses[v.status] if v.status != 'new' else 'Changed' }} by <strong>{{ v.status_by_name }}</strong> · {{ v.status_at|local }}</span>{% endif -%}
+      {%- if v.updated_by_name %}<span>Edited by <strong>{{ v.updated_by_name }}</strong> · {{ v.updated_at|local }}</span>{% endif -%}
+    </p>
+    {% if v.notes %}<p class="vcard-notes">{{ v.notes|truncate(140) }}</p>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{{ pager('voters.search', page, pages, query_args) }}
+{% if total > sizes[0] %}
+<form class="page-size" method="get" action="{{ url_for('voters.search') }}">
+  {% for k, val in query_args.items() if k != 'n' %}<input type="hidden" name="{{ k }}" value="{{ val }}">{% endfor %}
+  <label>Voters per page
+    <select name="n" data-autosubmit>
+      {% for s in sizes %}<option value="{{ s }}" {{ 'selected' if s == size }}>{{ s }}</option>{% endfor %}
+    </select>
+  </label>
+  <noscript><button class="small">Show</button></noscript>
+</form>
+{% endif %}
+{% else %}
+<div class="empty card">
+  <p><strong>No voters found.</strong></p>
+  <p class="muted">Try fewer words, or <a href="{{ url_for('voters.search') }}">clear the filters</a>.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Share on WhatsApp{% endblock %}
+{% block content %}
+<h1>Share on WhatsApp</h1>
+{% if voters %}
+<p class="muted">{{ voters|length }} voter{{ 's' if voters|length != 1 }}{% if to_name %} for <strong>{{ to_name }}</strong>{% endif %}{% if assigned %} · {{ assigned }} now assigned to them{% endif %}.</p>
+{% if mode == 'card' %}
+<p>Save the card{{ 's' if voters|length != 1 }}, then attach {{ 'them' if voters|length != 1 else 'it' }} in WhatsApp.</p>
+<div class="share-cards">
+  {% for url in cards %}<a href="{{ url }}" download><img src="{{ url }}" alt="Voter card" class="share-card"></a>{% endfor %}
+</div>
+{% endif %}
+<p><a class="button primary" href="{{ wa_url }}" target="_blank" rel="noopener noreferrer">{{ icon('chat', 18) }} Open WhatsApp{{ ' with the text' if mode == 'text' else '' }}</a></p>
+<pre class="share-text">{{ text }}</pre>
+{% endif %}
+{% endblock %}

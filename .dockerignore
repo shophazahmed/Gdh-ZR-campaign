@@ -1,0 +1,11 @@
+.venv
+instance
+data
+Data files
+tests
+**/__pycache__
+*.db
+*.log
+*.csv
+*.xls*
+.env

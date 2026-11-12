@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Check the confirmed list{% endblock %}
+{% block content %}
+<a class="backlink" href="{{ url_for('confirmed.overview') }}">{{ icon('back', 18) }} Back to 100% confirmed</a>
+<div class="page-head">
+  <h1>Check the list</h1>
+  <p class="muted">{{ count }} ID card{{ 's' if count != 1 }} in your list. Nothing is saved until you press the button below.</p>
+</div>
+
+<section class="kpis" aria-label="Summary">
+  <div class="kpi hero cf-hero"><span class="kpi-label">Will be confirmed</span><strong>{{ g_.new|length }}</strong></div>
+  <div class="kpi"><span class="kpi-label">Already confirmed</span><strong>{{ g_.already|length }}</strong></div>
+  <div class="kpi"><span class="kpi-label">Not in the campaign's party</span><strong>{{ g_.other|length }}</strong></div>
+  <div class="kpi"><span class="kpi-label">Not found</span><strong>{{ g_.missing|length }}</strong></div>
+</section>
+
+<form method="post" action="{{ url_for('confirmed.list_apply') }}" class="card form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="ids" value="{% for r in g_.new + g_.other %}{{ r.national_id }} {% endfor %}">
+  {% if g_.other %}
+  <label class="check"><input type="checkbox" name="include_other" value="1"> Also confirm the {{ g_.other|length }} voter{{ 's' if g_.other|length != 1 }} not in the campaign's party</label>
+  {% endif %}
+  <div class="actions"><button class="primary" {{ 'disabled' if not (g_.new or g_.other) }}>{{ icon('check', 18) }} Confirm these voters</button></div>
+</form>
+
+{% for key, title in [('new', 'Will be confirmed'), ('other', "Not in the campaign's party"), ('already', 'Already confirmed (no change)')] if g_[key] %}
+<details class="card" {{ 'open' if key != 'already' }}>
+  <summary><h2>{{ title }} · {{ g_[key]|length }}</h2></summary>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Name</th><th>House</th><th>Location</th>{% if key == 'other' %}<th>Party</th>{% endif %}</tr></thead>
+    <tbody>{% for r in g_[key] %}<tr><td>{{ r.full_name }}</td><td>{{ r.house_name }}</td><td>{{ r.location or '—' }}</td>{% if key == 'other' %}<td>{{ r.party or '—' }}</td>{% endif %}</tr>{% endfor %}</tbody>
+  </table></div>
+</details>
+{% endfor %}
+{% if g_.missing %}
+<details class="card" open>
+  <summary><h2>Not found in the portal · {{ g_.missing|length }}</h2></summary>
+  <p class="mono">{{ g_.missing|join(', ') }}</p>
+</details>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Gadhdhoo campaign</title>
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Gadhdhoo campaign">
+  <meta property="og:image" content="{{ url_for('picture.image', token=token, _external=True) }}">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="picture-page">
+  <img src="{{ url_for('picture.image', token=token) }}" alt="Campaign picture">
+</body>
+</html>

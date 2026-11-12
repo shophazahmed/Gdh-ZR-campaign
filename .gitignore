@@ -1,0 +1,16 @@
+# Voter data, photos, database and logs never go to git (personal data)
+instance/
+data/
+Data files/
+*.db
+*.db-*
+*.sqlite*
+merge_conflicts.log
+merged*.csv
+*.xlsx
+*.xls
+*.csv
+.env
+__pycache__/
+.pytest_cache/
+.venv/

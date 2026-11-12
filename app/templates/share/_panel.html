@@ -1,0 +1,35 @@
+{# Share on WhatsApp: only rendered for the owner account. single = one voter's ID, else ticked voters on Search. #}
+{% macro share_panel(single=None) %}
+<details class="card share-panel">
+  <summary>{{ icon('chat') }} Share on WhatsApp</summary>
+  <form method="post" action="{{ url_for('share.share') }}" class="form" data-share-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if single %}<input type="hidden" name="ids" value="{{ single }}">
+    {% else %}<p class="muted small-text">Tick up to 10 voters below. For more, use the PDF list.</p>{% endif %}
+    <label>Send to
+      <select name="to" data-share-to>
+        <option value="">Pick a chat in WhatsApp</option>
+        <option value="number">Another number…</option>
+        {% for role, label in [('agent', 'Agents'), ('user', 'Users'), ('admin', 'Admins')] %}
+        {% set group = share_people()|selectattr('role', 'equalto', role)|list %}
+        {% if group %}<optgroup label="{{ label }}">{% for p in group %}<option value="{{ p.id }}">{{ p.username }}{{ ' · ' ~ p.phone if p.phone else ' (no phone)' }}</option>{% endfor %}</optgroup>{% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label data-share-number hidden>Their number <input name="number" type="tel" inputmode="tel" placeholder="7771234" maxlength="15"></label>
+    <div class="row">
+      <fieldset class="checks"><legend>Language</legend>
+        <label class="check"><input type="radio" name="lang" value="en" checked> English</label>
+        <label class="check"><input type="radio" name="lang" value="dv"> ދިވެހި</label>
+      </fieldset>
+      <fieldset class="checks"><legend>Send as</legend>
+        <label class="check"><input type="radio" name="mode" value="card" checked> Card with photo</label>
+        <label class="check"><input type="radio" name="mode" value="text"> Text only</label>
+      </fieldset>
+    </div>
+    <label class="check" data-share-assign hidden><input type="checkbox" name="assign" value="1" checked> Also assign {{ 'this voter' if single else 'these voters' }} to them</label>
+    <p class="muted small-text" data-share-status></p>
+    <div class="actions"><button class="primary">{{ icon('chat', 18) }} Share</button></div>
+  </form>
+</details>
+{% endmacro %}

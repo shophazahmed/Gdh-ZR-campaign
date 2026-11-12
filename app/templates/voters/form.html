@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}{{ 'Add voter' if creating else 'Edit ' ~ v.full_name }}{% endblock %}
+{% block content %}
+<form class="card form" method="post" enctype="multipart/form-data"
+      action="{{ url_for('voters.create') if creating else url_for('voters.edit', national_id=v.national_id) }}">
+  <h1>{{ 'Add voter' if creating else 'Edit voter' }}</h1>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>ID card
+    {% if creating %}
+    <input name="national_id" value="{{ v.national_id or '' }}" placeholder="A123456" required maxlength="20">
+    {% else %}
+    <input value="{{ v.national_id }}" disabled>
+    {% endif %}
+  </label>
+  <label>Full name
+    <input name="full_name" value="{{ v.full_name or '' }}" required maxlength="200">
+  </label>
+  <div class="row">
+    <label>Sex
+      <select name="sex">
+        <option value="" {{ 'selected' if not v.sex }}>Not recorded</option>
+        <option value="M" {{ 'selected' if v.sex == 'M' }}>Male</option>
+        <option value="F" {{ 'selected' if v.sex == 'F' }}>Female</option>
+      </select>
+    </label>
+    <label>Age
+      <input name="age" type="number" min="0" max="130" value="{{ v.age if v.age is not none else '' }}">
+    </label>
+  </div>
+  <label>House name
+    <input name="house_name" value="{{ v.house_name or '' }}" maxlength="200">
+  </label>
+  <label>Party
+    <input name="party" value="{{ v.party or '' }}" maxlength="50">
+  </label>
+  <div class="row">
+    <label>Name in Dhivehi <input name="full_name_dv" value="{{ v.full_name_dv or '' }}" maxlength="200" lang="dv" dir="rtl" class="thaana"></label>
+    <label>House in Dhivehi <input name="house_name_dv" value="{{ v.house_name_dv or '' }}" maxlength="200" lang="dv" dir="rtl" class="thaana"></label>
+  </div>
+  <label>Location (where they vote)
+    <input name="location" value="{{ v.location or '' }}" maxlength="200" list="locations">
+    <datalist id="locations">{% for l in locations or [] %}<option value="{{ l }}">{% endfor %}</datalist>
+  </label>
+  <label>Phone
+    <input name="phone" type="tel" value="{{ v.phone or '' }}" maxlength="20" placeholder="7771234" inputmode="tel">
+  </label>
+  <label class="check"><input type="checkbox" name="deceased" value="1" {{ 'checked' if v.deceased }}> Deceased (kept on the list, no call or message buttons)</label>
+  <label>Photo (JPEG, PNG or WebP, up to 5 MB)
+    <input name="photo" type="file" accept="image/jpeg,image/png,image/webp">
+  </label>
+  {% if not creating and v.photo_path %}
+  <label class="check">{{ avatar(v) }} <input type="checkbox" name="remove_photo" value="1"> Remove current photo</label>
+  {% endif %}
+  <div class="actions">
+    <button class="primary">{{ 'Add voter' if creating else 'Save changes' }}</button>
+    <a class="button" href="{{ url_for('voters.search') if creating else url_for('voters.detail', national_id=v.national_id) }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

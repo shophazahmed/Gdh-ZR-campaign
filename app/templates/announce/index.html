@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Announcements{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Announcements</h1>
+  {% if is_admin %}
+  <p class="muted">Write it once: send it to the Agents WhatsApp group, and it shows here for everyone who signs in.</p>
+  {% else %}
+  <p class="muted">Messages from the campaign team.</p>
+  {% endif %}
+</div>
+
+{% if is_admin %}
+<form class="card announce-form" method="post" action="{{ url_for('announce.create') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Message
+    <textarea name="text" rows="5" maxlength="{{ max_len }}" dir="auto" required
+              placeholder="e.g. All agents: meeting at the office tonight 9:00 pm. Bring your voter lists."></textarea>
+  </label>
+  <label class="check"><input type="checkbox" name="urgent" value="1" checked> Urgent: show as a banner at the top of the portal until each person taps “Seen”</label>
+  <div class="actions"><button class="primary">Save announcement</button></div>
+</form>
+{% endif %}
+
+<ul class="announce-list">
+  {% for a in rows %}
+  {% set who = seen.get(a.id, []) %}
+  <li class="card announce {{ 'urgent' if a.urgent }} {{ 'ended' if a.ended_at }} {{ 'just' if just == a.id }}" id="a-{{ a.id }}">
+    <p class="announce-head">
+      {% if a.urgent %}<span class="badge badge-urgent">Urgent</span>{% else %}<span class="badge">Notice</span>{% endif %}
+      <strong>{{ a.created_by_name or 'Admin' }}</strong>
+      <span class="muted small-text">{{ a.created_at|local }}</span>
+      {% if a.ended_at %}<span class="muted small-text">· taken down</span>{% endif %}
+    </p>
+    <p class="announce-text" dir="auto">{{ a.text }}</p>
+    {% if is_admin %}
+    <div class="actions">
+      <a class="button {{ 'primary' if just == a.id }} wa-btn" href="{{ wa(a) }}" target="_blank" rel="noopener">{{ icon('send', 16) }} Send to WhatsApp group</a>
+      {% if not a.ended_at %}
+      <form method="post" action="{{ url_for('announce.end', aid=a.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="small">Take down</button>
+      </form>
+      {% endif %}
+    </div>
+    <details class="seen-by">
+      <summary>Seen by {{ who|length }} of {{ audience|length - 1 }} on the portal</summary>
+      {% set seen_ids = who|map(attribute='username')|list %}
+      <ul>
+        {% for w in who %}<li>✓ {{ w.username }} <span class="muted small-text">{{ w.seen_at|local }}</span></li>{% endfor %}
+        {% for p in audience if p.username not in seen_ids and p.username != a.created_by_name %}<li class="muted">· {{ p.username }} — not yet</li>{% endfor %}
+      </ul>
+      <p class="muted small-text">Agents without a login only get it through the WhatsApp group.</p>
+    </details>
+    {% endif %}
+  </li>
+  {% else %}
+  <li class="muted">No announcements yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

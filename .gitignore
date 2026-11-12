@@ -14,3 +14,6 @@ merged*.csv
 __pycache__/
 .pytest_cache/
 .venv/
+
+# Per-candidate settings and secrets (deploy/vp.sh)
+candidates/

@@ -1,19 +1,32 @@
-# Gadhdhoo voter portal
+# GDh MG campaign: voter portal for many candidates
 
-A private, login-only voter list for `vote.seenu.online`: search and filter voters,
-view photos, and (for admins) edit records, export lists, manage users and read the
-activity log.
+A private, login-only voter list: search and filter voters, view photos, canvass, assign agents,
+and (for admins) edit records, export lists, manage users and read the activity log.
+It started as the Gadhdhoo portal on `vote.seenu.online` and now serves **any number of candidates
+from one code base**: each candidate gets **their own container, database, photos, domain and
+admin account**, so one campaign can never see another's voters.
 
-**Stack:** Python 3 · Flask · SQLite (WAL) · Gunicorn · Nginx + Let's Encrypt · systemd
-(or Docker behind Traefik). The front end is server-rendered HTML with its own CSS (light and
-dark themes, mobile layout). It uses no CDN or third-party scripts, so a strict CSP is possible.
+**Stack:** Python 3 · Flask · SQLite (WAL) · Gunicorn · Docker behind the VPS's shared Traefik
+(or Nginx + systemd for a single portal). The front end is server-rendered HTML with its own CSS
+(light and dark themes, mobile layout). It uses no CDN or third-party scripts, so a strict CSP is possible.
 
 ```
-browser ──HTTPS──► Nginx (TLS, HSTS, rate limit on /login) ──► Gunicorn 127.0.0.1:8001 ──► Flask app
-                                                                                      │
-                                     /var/lib/voter-portal/voter_portal.db  ◄─────────┤
-                                     /var/lib/voter-portal/photos/A123456.jpg ◄───────┘
+                      ┌─► vp-gadhdhoo  (container) ─► volume vp-gadhdhoo_data  (database + photos)
+browser ──HTTPS──► Traefik ─► vp-gdh-mg    (container) ─► volume vp-gdh-mg_data
+  (Host: …)           └─► vp-<slug>    (container) ─► volume vp-<slug>_data
+                     all built from the same image  vote-portal:<version>
 ```
+
+What differs per candidate, and where it's set:
+
+| | Where |
+|---|---|
+| Domain, version, secret key, first admin password | `candidates/<slug>/.env` on the server (`deploy/vp.sh new`) |
+| Campaign name (title bar, sign-in, PDFs) | `.env` at first, then **Settings → Campaign name** |
+| Parties shown, colour, WhatsApp/SMS/Viber messages, picture, Dhivehi font | **Settings** in that candidate's portal |
+| Voters, photos, users, agents, canvassing, 100% confirmed list | That candidate's own database (Import page) |
+
+See [Many candidates on one VPS](#many-candidates-on-one-vps) for setup.
 
 ## Roles
 
@@ -199,8 +212,17 @@ tests/               pytest suite with made-up fixture files (no real voter data
 
 ## Importing the voter files
 
-`scripts/ingest.py` reads the four files from one folder. They can be `.xlsx`, `.xlsm`, `.xls`
-or `.csv`, and the names are matched loosely:
+`scripts/ingest.py` reads every voter file in one folder (`.xlsx`, `.xlsm`, `.xls` or `.csv`;
+PDF lists through the Import page). Columns are found by their header names and values, so each
+candidate's own sheets work as they are.
+
+**Any campaign (generic):** when the same ID card appears in more than one file, the file whose
+name sorts first wins, field by field (a blank never erases a value). Number the files, newest
+first: `1 voters 2026.xlsx`, `2 party list.csv`, `3 old list.xlsx`. A set of files with no ID card
+column stops with an error and changes nothing.
+
+**Gadhdhoo:** when one of the Gadhdhoo file names below is present, the four files are used with this
+fixed priority instead (names matched loosely), including the MDP-list rule:
 
 | Priority | File | Used for |
 |---|---|---|
@@ -432,28 +454,79 @@ Restore a backup: `sudo systemctl stop voter-portal`, then copy the `.db` file o
 `/var/lib/voter-portal/voter_portal.db` (owned by `voterportal`, mode 600), then `sudo systemctl start voter-portal`.
 Copy the backups off the server regularly too (e.g. `scp` to your PC).
 
-## Option B: Docker behind an existing Traefik
+## Many candidates on one VPS
 
-For a server where Traefik already serves HTTPS (the labels match the Hostinger setup used by
-`docker-compose.traefik.yml` in this repo: entrypoint `websecure`, resolver `letsencrypt`).
+Each candidate is one Docker Compose project (`vp-<slug>`) made from `deploy/candidate-compose.yml`.
+Every container, Traefik router, middleware and volume name includes the slug, so candidates never
+clash. `deploy/vp.sh` does all of it.
+
+**Naming:** slug = short lowercase name (`gadhdhoo`, `gdh-mg`); domain = `<slug>.vote.seenu.online`
+(Gadhdhoo keeps `vote.seenu.online`). DNS: one wildcard record `*.vote.seenu.online  A  <VPS IP>`
+plus `vote.seenu.online  A  <VPS IP>`. Traefik answers only the domains it has a candidate for and gets a
+Let's Encrypt certificate for each one. Don't put Cloudflare's proxy (orange cloud) in front of the
+two-level names unless you have a certificate that covers them.
+
+### First time on the server
 
 ```bash
-cd ~/CMS/voter-portal
-cp .env.example .env && chmod 600 .env
-sed -i "s/^VOTER_PORTAL_SECRET_KEY=.*/VOTER_PORTAL_SECRET_KEY=$(openssl rand -hex 32)/" .env
-docker compose up -d --build
-docker network connect voter-portal_web traefik   # only if Traefik isn't on the host network
-
-# import (files copied to /root/voter-data as in A2)
-docker compose cp /root/voter-data voter-portal:/data/import
-docker compose exec -e SEED_ADMIN_PASSWORD='choose-a-long-one' voter-portal \
-  python scripts/ingest.py --data-dir /data/import --log /data/merge_conflicts.log
-docker compose exec -u root voter-portal rm -rf /data/import
-docker compose exec voter-portal flask --app wsgi set-password admin   # if ever needed
+git clone https://github.com/<owner>/Gdh-mg-campaign /opt/vote && cd /opt/vote
+git tag                              # releases, e.g. v1.0
 ```
 
-If your Traefik's entrypoint or resolver names differ, adjust the labels in `docker-compose.yml`.
-Back up the `voter-portal_voter-data` volume (it holds the database and photos).
+### Add a candidate
+
+```bash
+cd /opt/vote
+deploy/vp.sh new gdh-mg mg.vote.seenu.online "GDh MG" v1.0
+#  -> prints the URL and the one-time admin password (changed at first sign-in)
+```
+
+Then the candidate's admin signs in, sets **Settings** (parties, colour, messages) and uploads the
+voter files on the **Import** page (see below; any file names work).
+
+### Day-to-day
+
+```bash
+deploy/vp.sh list                         # every candidate: domain, version, health
+deploy/vp.sh logs gdh-mg
+deploy/vp.sh flask gdh-mg create-user aisha --role user
+deploy/vp.sh flask gdh-mg set-password admin
+deploy/vp.sh ingest gdh-mg /root/gdh-mg-files      # import from the server instead of the web page
+deploy/vp.sh backup all                   # /var/backups/vote/<slug>/, newest 14 kept
+deploy/vp.sh stop gdh-mg                  # data is kept
+```
+
+Nightly backups, copied off the server by your own sync:
+`15 2 * * * cd /opt/vote && deploy/vp.sh backup all >/var/log/vote-backup.log 2>&1`
+
+### Releases and upgrades (one candidate at a time)
+
+Each candidate is pinned to a git tag, so pushing code never changes a live portal by itself.
+
+```bash
+git tag v1.1 && git push --tags           # on your PC, when a version is ready
+cd /opt/vote && git fetch --tags
+deploy/vp.sh upgrade demo v1.1            # try it on a demo candidate first
+deploy/vp.sh upgrade gdh-mg v1.1          # backs up, rebuilds, restarts; to go back: upgrade gdh-mg v1.0
+```
+
+### Moving the live Gadhdhoo portal into this setup
+
+The current Gadhdhoo container (from the CMS repo) keeps its data in a Docker volume, usually
+`voter-portal_voter-data` (check with `docker volume ls`). Takes about a minute of downtime:
+
+```bash
+cd /opt/vote
+VP_NO_START=1 deploy/vp.sh new gadhdhoo vote.seenu.online "Gadhdhoo" v1.0
+# optional: keep everyone signed in by reusing the old secret
+#   copy VOTER_PORTAL_SECRET_KEY from the old .env into candidates/gadhdhoo/.env
+docker stop <old voter-portal container>          # see: docker ps
+deploy/vp.sh adopt gadhdhoo voter-portal_voter-data
+deploy/vp.sh list                                 # gadhdhoo  vote.seenu.online  v1.0  running (healthy)
+```
+
+`adopt` copies the data; the old volume stays untouched until you remove it. To roll back: stop
+`vp-gadhdhoo` and start the old container again.
 
 ## Privacy
 

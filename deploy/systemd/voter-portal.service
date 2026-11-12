@@ -1,5 +1,5 @@
 [Unit]
-Description=Gadhdhoo voter portal (Gunicorn)
+Description=Campaign voter portal (Gunicorn)
 After=network.target
 
 [Service]

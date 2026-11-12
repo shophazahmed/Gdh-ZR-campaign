@@ -1,0 +1,39 @@
+# One candidate = one container + one data volume (SQLite database, photos, campaign picture, font).
+# Don't run this file by hand: use deploy/vp.sh, which passes the candidate's env file, e.g.
+#
+#   docker compose -p vp-<slug> --env-file candidates/<slug>/.env -f deploy/candidate-compose.yml up -d
+#
+# Every name that Traefik or Docker sees includes the slug, so candidates never clash.
+services:
+  app:
+    image: vote-portal:${VP_VERSION:?set VP_VERSION in the candidate env}
+    container_name: vp-${VP_SLUG:?set VP_SLUG}
+    restart: unless-stopped
+    environment:
+      VOTER_PORTAL_SECRET_KEY: ${VOTER_PORTAL_SECRET_KEY:?}
+      VOTER_PORTAL_ADMIN_PASSWORD: ${VOTER_PORTAL_ADMIN_PASSWORD:-}
+      VOTER_PORTAL_CAMPAIGN_NAME: ${VOTER_PORTAL_CAMPAIGN_NAME:-}
+      VOTER_PORTAL_DATA_DIR: /data
+      GUNICORN_BIND: 0.0.0.0:8000
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+      FORWARDED_ALLOW_IPS: "*"   # only Traefik reaches the container
+      TZ: Indian/Maldives
+    volumes:
+      - data:/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.vp-${VP_SLUG}.rule=Host(`${VP_DOMAIN:?set VP_DOMAIN}`)
+      - traefik.http.routers.vp-${VP_SLUG}.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.vp-${VP_SLUG}.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.vp-${VP_SLUG}.middlewares=vp-${VP_SLUG}-headers,vp-${VP_SLUG}-ratelimit
+      - traefik.http.middlewares.vp-${VP_SLUG}-headers.headers.stsSeconds=31536000
+      - traefik.http.middlewares.vp-${VP_SLUG}-ratelimit.ratelimit.average=20
+      - traefik.http.middlewares.vp-${VP_SLUG}-ratelimit.ratelimit.burst=40
+      - traefik.http.services.vp-${VP_SLUG}.loadbalancer.server.port=8000
+    deploy:
+      resources:
+        limits:
+          memory: ${VP_MEMORY:-512m}
+
+volumes:
+  data:   # becomes vp-<slug>_data

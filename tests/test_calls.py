@@ -241,3 +241,42 @@ def test_zr_file_columns(tmp_path):
             r["constituency"], r["location"], r["box_code"]) == (
         "Ali Test", "Rose", "Rose, Majeedhee Magu", "7771234, 9991234", "Male'", "GDh", "Thinadhoo",
         "Thinadhoo North", "Thinadhoo School", "G1.1")
+
+
+def test_users_and_agents_see_only_their_islands(app):
+    ali = add_agent(app, "ali")
+    c = admin(app)
+    turn_on(c)
+    viewer = db(app).execute("SELECT id FROM users WHERE username = 'viewer'").fetchone()[0]
+    give_island(c, "Thinadhoo", ali)
+    give_island(c, "Fares-Maathoda", viewer)
+    a = agent_client(app, "ali")
+    page = a.get("/?n=200").get_data(as_text=True)
+    assert "Ahmed One" in page and "Aishath Two" in page
+    assert "Hassan Three" not in page and "Aminath Alpha" not in page     # other island / no island
+    assert a.get("/voters/A300003").status_code == 404
+    assert a.get("/voters/A300001").status_code == 200
+    u = app.test_client()
+    login(u, "viewer", USER_PW)
+    page = u.get("/?n=200").get_data(as_text=True)
+    assert "Hassan Three" in page and "Fathimath Four" in page and "Ahmed One" not in page
+    assert u.get("/voters/A300001").status_code == 404
+    assert u.get("/?q=Ahmed").get_data(as_text=True).count('id="v-A3') == 0
+    # The admin still sees everyone
+    assert "Aminath Alpha" in c.get("/?n=200").get_data(as_text=True)
+
+
+def test_my_dashboard(app):
+    ali, bob = add_agent(app, "ali"), add_agent(app, "bob")
+    c = admin(app)
+    turn_on(c)
+    give_island(c, "Thinadhoo", ali)
+    give_island(c, "Fares-Maathoda", bob)
+    a, b = agent_client(app, "ali"), agent_client(app, "bob")
+    log(a, "A300001", "reached", "will come to vote")
+    log(b, "A300003", "noanswer", "bob's note")
+    page = a.get("/calls/mine").get_data(as_text=True)
+    assert "My dashboard" in page and "Thinadhoo" in page and "50%" in page
+    assert "will come to vote" in page and "bob's note" not in page
+    assert "Fares-Maathoda" not in page.split("My islands")[1].split("My latest calls")[0]
+    assert c.get("/calls/mine").status_code == 302          # the admin has the full dashboard

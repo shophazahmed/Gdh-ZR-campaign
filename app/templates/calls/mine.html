@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "calls/_form.html" import reach_bar %}
+{% block title %}My dashboard{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>My dashboard</h1>
+  <p class="muted">{% if islands %}Your island{{ 's' if islands|length != 1 }}: <strong>{% for i in islands %}{{ island_label(i) }}{{ ', ' if not loop.last }}{% endfor %}</strong>{% else %}No island has been given to you yet.{% endif %}</p>
+  {% if islands %}<a class="button primary" href="{{ url_for('calls.queue') }}">{{ icon('phone', 18) }} Start calling</a>{% endif %}
+</div>
+
+<section class="kpis" aria-label="My calls">
+  <div class="kpi hero">
+    <span class="kpi-label">My calls today</span>
+    <strong>{{ me.calls_today }}</strong>
+    <span class="muted">{{ me.reached_today }} reached · {{ me.calls_week }} calls this week ({{ me.reached_week }} reached)</span>
+  </div>
+  <div class="kpi"><span class="kpi-label">All my calls</span><strong>{{ me.calls_all }}</strong></div>
+  <div class="kpi"><span class="kpi-label">Voters I reached</span><strong>{{ me.reached_all }}</strong></div>
+  {% if counts %}
+  <div class="kpi"><span class="kpi-label">Call-backs due</span><strong>{{ counts.due }}</strong></div>
+  <div class="kpi"><span class="kpi-label">Never tried</span><strong>{{ counts.never }}</strong></div>
+  {% endif %}
+</section>
+
+{% if rows %}
+<h2>My islands</h2>
+<ul class="house-list">
+  {% for r in rows %}
+  <li class="house-row {{ 'done' if r.reached == r.total }}">
+    <div class="house-link">
+      <span class="house-name">{{ island_label(r.island) }}</span>
+      <span class="house-meta"><strong>{{ r.pct }}%</strong> <span class="mono">{{ r.reached }}/{{ r.total }}</span></span>
+    </div>
+    {{ reach_bar(r) }}
+    <p class="island-meta small-text">
+      <span>{{ r.tried_pct }}% called</span><span>{{ r.never }} never tried</span>
+      <span>{{ r.callback }} call-back{{ 's' if r.callback != 1 }}</span>
+      {% if r.hard %}<span>{{ r.hard }} hard to reach</span>{% endif %}
+      {% if r.wrongnumber %}<span>{{ r.wrongnumber }} wrong number</span>{% endif %}
+      {% if r.nophone %}<span>{{ r.nophone }} no phone</span>{% endif %}
+    </p>
+  </li>
+  {% endfor %}
+</ul>
+<p class="legend" aria-hidden="true">
+  <span><i class="seg-contacted"></i>Reached</span><span><i class="seg-refused"></i>Refused</span>
+  <span><i class="seg-followup"></i>Call back</span><span><i class="seg-noanswer"></i>Hard to reach</span>
+  <span><i class="seg-wrong"></i>Wrong number</span>
+</p>
+{% endif %}
+
+<h2>My latest calls</h2>
+{% if recent %}
+<ol class="call-history card">
+  {% for c in recent %}
+  <li>
+    <a href="{{ url_for('calls.voter_page', national_id=c.national_id, back=request.full_path) }}"><strong>{{ c.full_name }}</strong></a>
+    <span class="tag out-tag-{{ c.outcome }}">{{ outcomes.get(c.outcome, c.outcome) }}</span>
+    <span class="muted small-text">{{ island_label(c.island) }} · {{ c.at|local }}{% if c.callback_at %} · call back {{ c.callback_at|local }}{% endif %}</span>
+    {% if c.comment %}<p dir="auto">{{ c.comment }}</p>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% else %}<div class="empty card"><p>No calls yet.</p></div>{% endif %}
+{% endblock %}

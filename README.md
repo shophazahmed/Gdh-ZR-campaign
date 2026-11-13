@@ -41,6 +41,11 @@ portal keeps this off and doesn't change.
 2. **Users**: add each call agent (a *user*, or an *agent* given a sign-in) and hand them their password.
 3. **Calls → Islands**: tick which agents call each island. One agent can have several islands.
 
+**Users and agents see only their own islands** while the call centre is on: search, voter pages
+and the call list leave out every other island (and voters with no island). Admins see everything.
+Each has **My dashboard**: their islands' progress, their calls today / this week, and their latest
+calls and comments.
+
 **Agents** sign in straight to **Calls**: the next voter of their islands, a **Call** button per number,
 then one tap for the outcome (**Reached · No answer · Switched off · Wrong number · Call back later ·
 Refused**), a comment, and **Save and next**.

@@ -437,10 +437,16 @@ def _anchor(island):
 
 # --- dashboard (admin) -----------------------------------------------------------------
 
-def island_stats():
+def island_stats(islands=None):
+    """Reachability per island; `islands` limits it (an agent's own islands)."""
     now = _iso(_now())
     state = _state_sql(campaign.call_rule("call_max_attempts"), now)
-    w, p = _scope(" WHERE v.deceased = 0")
+    where, params = " WHERE v.deceased = 0", []
+    if islands is not None:
+        marks = ", ".join("?" * len(islands)) or "NULL"
+        where += f" AND v.island IN ({marks})"
+        params += list(islands)
+    w, p = _scope(where, params)
     rows = get_db().execute(
         f"SELECT island, COUNT(*) AS total, SUM(st != 'nophone') AS with_phone, SUM(st = 'nophone') AS nophone,"
         " SUM(tried) AS tried, SUM(st = 'reached') AS reached, SUM(st = 'refused') AS refused,"
@@ -509,6 +515,31 @@ def dashboard():
                            recent=comment_rows({"only": "1"}, limit=8)[0], outcomes=OUTCOMES,
                            max_attempts=campaign.call_rule("call_max_attempts"), island_label=island_label,
                            no_island=NO_ISLAND)
+
+
+@bp.route("/mine")
+@login_required
+def mine():
+    """An agent's or user's own dashboard: their islands' progress, their calls, their latest comments."""
+    _require_on()
+    user = g.user
+    if user["role"] == "admin":
+        return redirect(url_for("calls.dashboard"))
+    islands = my_islands()
+    rows, total = island_stats(islands) if islands else ([], {})
+    db = get_db()
+    today, week = _local_midnight_utc(0), _local_midnight_utc(6)
+    me = db.execute(
+        "SELECT SUM(at >= ?) AS calls_today, SUM(at >= ? AND outcome = 'reached') AS reached_today,"
+        " SUM(at >= ?) AS calls_week, SUM(at >= ? AND outcome = 'reached') AS reached_week,"
+        " COUNT(*) AS calls_all, SUM(outcome = 'reached') AS reached_all FROM calls WHERE user_id = ?",
+        (today, today, week, week, user["id"])).fetchone()
+    recent = db.execute(
+        "SELECT c.*, v.full_name, v.island FROM calls c JOIN voters v ON v.national_id = c.national_id"
+        " WHERE c.user_id = ? ORDER BY c.at DESC, c.id DESC LIMIT 20", (user["id"],)).fetchall()
+    return render_template("calls/mine.html", rows=rows, total=total, me={k: me[k] or 0 for k in me.keys()},
+                           recent=recent, outcomes=OUTCOMES, islands=islands, counts=queue_counts(user),
+                           max_attempts=campaign.call_rule("call_max_attempts"), island_label=island_label)
 
 
 # --- comments feed and call log (admin) --------------------------------------------------

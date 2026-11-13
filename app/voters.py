@@ -99,7 +99,12 @@ def agent_scope():
     """SQL limiting an agent to their voters (None for other roles): the ones handed to them one by one,
     plus everyone in their houses who hasn't been handed to someone individually."""
     user = g.get("user")
-    if user is not None and user["role"] == "agent":
+    if user is None or user["role"] == "admin":
+        return None, []
+    if campaign.call_center_on():
+        # Call centre: agents and users see only the islands given to them (Calls → Islands)
+        return "island IN (SELECT island FROM island_agents WHERE user_id = ?)", [user["id"]]
+    if user["role"] == "agent":
         return handled_by(), [user["id"], user["id"]]
     return None, []
 

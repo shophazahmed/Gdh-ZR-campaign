@@ -29,6 +29,7 @@
       {% set cc = call_center_on() %}
       {% if cc %}
       <a href="{{ url_for('calls.queue') }}" {{ 'aria-current=page' if ep in ('calls.queue', 'calls.voter_page') }}>Calls</a>
+      {% if not is_admin %}<a href="{{ url_for('calls.mine') }}" {{ 'aria-current=page' if ep == 'calls.mine' }}>My dashboard</a>{% endif %}
       {% if is_admin %}
       <a href="{{ url_for('calls.dashboard') }}" {{ 'aria-current=page' if ep in ('calls.dashboard', 'calls.by_state') }}>Reachability</a>
       <a href="{{ url_for('calls.comments') }}" {{ 'aria-current=page' if ep == 'calls.comments' }}>Comments</a>
@@ -130,6 +131,7 @@
     {% set cc = call_center_on() %}
     {% if cc %}
     <a href="{{ url_for('calls.queue') }}" {{ 'aria-current=page' if ep in ('calls.queue', 'calls.voter_page') }}>{{ icon('phone') }}<span>Calls</span></a>
+    {% if not is_admin %}<a href="{{ url_for('calls.mine') }}" {{ 'aria-current=page' if ep == 'calls.mine' }}>{{ icon('chart') }}<span>My dashboard</span></a>{% endif %}
     {% endif %}
     {% if role == 'agent' and not cc %}
     <a href="{{ url_for('canvass.my_houses') }}" {{ 'aria-current=page' if ep == 'canvass.my_houses' }}>{{ icon('home') }}<span>My dashboard</span></a>

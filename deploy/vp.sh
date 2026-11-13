@@ -39,11 +39,17 @@ build() {
   local version="${1:?usage: vp.sh build <git tag or branch>}"
   git -C "$ROOT" rev-parse --verify --quiet "$version^{commit}" >/dev/null \
     || die "'$version' is not a tag, branch or commit here (try: git fetch --tags)"
+  local commit; commit="$(git -C "$ROOT" rev-parse "$version^{commit}")"
+  local built; built="$(docker image inspect -f '{{index .Config.Labels "vp.commit"}}' "vote-portal:$version" 2>/dev/null || true)"
+  if [[ "$built" == "$commit" ]]; then
+    echo "vote-portal:$version already built (${commit:0:7})"; return
+  fi
   if docker image inspect "vote-portal:$version" >/dev/null 2>&1; then
-    echo "vote-portal:$version already built"; return
+    echo "vote-portal:$version was built from other code; rebuilding from ${commit:0:7}"
   fi
   # Build from exactly that version, not from whatever is checked out
-  git -C "$ROOT" archive "$version" | docker build -t "vote-portal:$version" -
+  git -C "$ROOT" archive "$version" | docker build --label "vp.commit=$commit" \
+    --build-arg "VP_BUILD=$version (${commit:0:7})" -t "vote-portal:$version" -
 }
 
 set_env() {  # set_env <slug> KEY VALUE

@@ -1,6 +1,7 @@
 FROM python:3.12-slim
+ARG VP_BUILD=dev
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+ENV VOTER_PORTAL_VERSION=${VP_BUILD} PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     VOTER_PORTAL_DATA_DIR=/data GUNICORN_BIND=0.0.0.0:8000
 RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 && rm -rf /var/lib/apt/lists/* \
  && useradd --system --uid 10001 --home /data voterportal

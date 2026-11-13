@@ -61,7 +61,7 @@
         <span class="account-name">{{ current_user.username }}</span>
       </summary>
       <div class="account-menu">
-        <p><strong>{{ current_user.username }}</strong><br><span class="muted">{{ {'admin': 'Admin', 'agent': 'Agent (canvasser)', 'user': 'Read-only user'}[role] }}</span></p>
+        <p><strong>{{ current_user.username }}</strong><br><span class="muted">{{ ({'admin': 'Admin', 'agent': 'Agent (caller)', 'user': 'Caller'} if call_center_on() else {'admin': 'Admin', 'agent': 'Agent (canvasser)', 'user': 'Read-only user'})[role] }}</span></p>
         {% if is_admin %}
         <a href="{{ url_for('voters.create') }}">Add a voter</a>
         <a href="{{ url_for('admin.changes') }}">Changes</a>
@@ -85,6 +85,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="link">Sign out</button>
         </form>
+        <p class="muted small-text">Version {{ config.VERSION }}</p>
       </div>
     </details>
   </header>

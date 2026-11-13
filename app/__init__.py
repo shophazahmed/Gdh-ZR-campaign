@@ -33,6 +33,7 @@ def create_app(test_config=None):
         IMPORTS_DIR=os.path.join(base, "imports"),
         CAMPAIGN_DIR=os.path.join(base, "campaign"),
         CAMPAIGN_NAME=os.environ.get("VOTER_PORTAL_CAMPAIGN_NAME", "").strip(),
+        VERSION=os.environ.get("VOTER_PORTAL_VERSION", "dev"),
         SESSION_COOKIE_NAME="vp_session",
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",

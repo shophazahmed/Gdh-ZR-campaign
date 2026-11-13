@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "calls/_form.html" import reach_bar %}
+{% block title %}Call dashboard{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Reachability</h1>
+  <p class="muted">Calls per island and per agent. "Hard to reach" means {{ max_attempts }} tries without an answer.</p>
+</div>
+
+{% if total %}
+<section class="kpis" aria-label="Totals">
+  <div class="kpi hero">
+    <span class="kpi-label">Voters reached</span>
+    <strong>{{ total.pct }}%</strong>
+    <span class="muted">{{ total.reached }} of {{ total.total }} · {{ total.tried_pct }}% called at least once</span>
+    {{ reach_bar(total, 'lg') }}
+  </div>
+  {% for key, label in [('reached', 'Reached'), ('refused', 'Refused'), ('callback', 'Call-backs booked'), ('due', 'Call-backs due now'), ('hard', 'Hard to reach'), ('wrongnumber', 'Wrong number'), ('never', 'Never tried'), ('nophone', 'No phone number')] %}
+  <a class="kpi" href="{{ url_for('calls.by_state', state='callback' if key == 'callback' else key) }}"><span class="kpi-label">{{ label }}</span><strong>{{ total[key] }}</strong></a>
+  {% endfor %}
+</section>
+<p class="legend" aria-hidden="true">
+  <span><i class="seg-contacted"></i>Reached</span><span><i class="seg-refused"></i>Refused</span>
+  <span><i class="seg-followup"></i>Call back</span><span><i class="seg-noanswer"></i>Hard to reach</span>
+  <span><i class="seg-wrong"></i>Wrong number</span><span><i class="seg-track"></i>Not yet</span>
+</p>
+
+<h2>Per island</h2>
+<ul class="house-list">
+  {% for r in rows %}
+  {% set isl = r.island or no_island %}
+  <li class="house-row {{ 'done' if r.reached == r.total }}">
+    <a class="house-link" href="{{ url_for('calls.by_state', state='reached', island=isl) }}">
+      <span class="house-name">{{ island_label(r.island) }}</span>
+      <span class="house-meta"><strong>{{ r.pct }}%</strong> <span class="mono">{{ r.reached }}/{{ r.total }}</span></span>
+    </a>
+    {{ reach_bar(r) }}
+    <p class="island-meta small-text">
+      <span>{{ r.tried_pct }}% called</span>
+      <a href="{{ url_for('calls.by_state', state='never', island=isl) }}">{{ r.never }} never tried</a>
+      <a href="{{ url_for('calls.by_state', state='callback', island=isl) }}">{{ r.callback }} call-back{{ 's' if r.callback != 1 }}</a>
+      {% if r.due %}<a class="tag" href="{{ url_for('calls.by_state', state='due', island=isl) }}">{{ r.due }} due now</a>{% endif %}
+      {% if r.hard %}<a href="{{ url_for('calls.by_state', state='hard', island=isl) }}">{{ r.hard }} hard to reach</a>{% endif %}
+      {% if r.refused %}<a href="{{ url_for('calls.by_state', state='refused', island=isl) }}">{{ r.refused }} refused</a>{% endif %}
+      {% if r.wrongnumber %}<a href="{{ url_for('calls.by_state', state='wrongnumber', island=isl) }}">{{ r.wrongnumber }} wrong number</a>{% endif %}
+      {% if r.nophone %}<a href="{{ url_for('calls.by_state', state='nophone', island=isl) }}">{{ r.nophone }} no phone</a>{% endif %}
+    </p>
+  </li>
+  {% endfor %}
+</ul>
+
+<h2>Calls per day (last 14 days)</h2>
+<div class="card">
+  <svg class="daychart" viewBox="0 0 280 110" role="img" aria-label="Calls and reached per day">
+    {% for d in days %}
+    {% set x = loop.index0 * 20 + 2 %}
+    <rect class="seg-track-fill" x="{{ x }}" y="{{ 100 - d.h_calls }}" width="16" height="{{ d.h_calls }}"><title>{{ d.day.strftime('%-d %b') }}: {{ d.calls }} calls</title></rect>
+    <rect class="seg-contacted" x="{{ x }}" y="{{ 100 - d.h_reached }}" width="16" height="{{ d.h_reached }}"><title>{{ d.day.strftime('%-d %b') }}: {{ d.reached }} reached</title></rect>
+    <text x="{{ x + 8 }}" y="109" text-anchor="middle">{{ d.day.day }}</text>
+    {% endfor %}
+  </svg>
+  <p class="legend" aria-hidden="true"><span><i class="seg-track"></i>Calls</span><span><i class="seg-contacted"></i>Reached</span></p>
+</div>
+{% else %}
+<div class="empty card"><p>No voters yet. <a href="{{ url_for('imports.index') }}">Import the voter list</a>, then give islands to agents.</p></div>
+{% endif %}
+
+<h2>Agents</h2>
+{% if agents %}
+<div class="table-wrap">
+<table class="stack">
+  <thead><tr><th>Agent</th><th>Islands</th><th>Today</th><th>Last 7 days</th><th>All time</th><th>Last call</th></tr></thead>
+  <tbody>
+  {% for a in agents %}
+  <tr class="{{ 'inactive' if not a.is_active }}">
+    <td data-label="Agent"><a href="{{ url_for('calls.comments', agent=a.id, only='0') }}">{{ a.username }}</a></td>
+    <td data-label="Islands">{{ a.islands or '—' }}</td>
+    <td data-label="Today">{{ a.calls_today or 0 }} calls · {{ a.reached_today or 0 }} reached</td>
+    <td data-label="Last 7 days">{{ a.calls_week or 0 }} calls · {{ a.reached_week or 0 }} reached</td>
+    <td data-label="All time">{{ a.calls_all or 0 }}</td>
+    <td data-label="Last call">{{ a.last_at|local if a.last_at else '—' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty card"><p>No agents yet. <a href="{{ url_for('calls.islands') }}">Give islands to agents</a>.</p></div>
+{% endif %}
+
+<div class="page-head">
+  <h2>Latest comments</h2>
+  <a class="button small" href="{{ url_for('calls.comments') }}">All comments</a>
+</div>
+{% if recent %}
+<ol class="call-history card">
+  {% for c in recent %}
+  <li>
+    <a href="{{ url_for('calls.voter_page', national_id=c.national_id) }}"><strong>{{ c.full_name }}</strong></a>
+    <span class="tag out-tag-{{ c.outcome }}">{{ outcomes.get(c.outcome, c.outcome) }}</span>
+    <span class="muted small-text">{{ island_label(c.island) }} · {{ c.username or '—' }} · {{ c.at|local }}</span>
+    <p dir="auto">{{ c.comment }}</p>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}<div class="empty card"><p>No comments yet.</p></div>{% endif %}
+{% endblock %}

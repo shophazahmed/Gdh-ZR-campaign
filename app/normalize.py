@@ -98,6 +98,38 @@ def normalize_phone(value):
     return "", f"unreadable phone number '{raw}'"
 
 
+_PHONE_SPLIT = re.compile(r"\s*(?:[,;/|\n&]|\bor\b)\s*", re.I)
+
+
+def split_phones(text):
+    """'7771234, 9991234' -> ['7771234', '9991234'] (a stored phone cell may hold several numbers)."""
+    return [p for p in (x.strip() for x in _PHONE_SPLIT.split(text or "")) if p]
+
+
+def normalize_phones(value):
+    """Return (phones, note) for a cell that may hold several numbers ('7771234 / 9991234').
+
+    Each number is cleaned like normalize_phone; the result is joined with ', ' (duplicates dropped).
+    Two 7-digit numbers written with only a space between them are split too.
+    """
+    if is_blank(value):
+        return "", None
+    raw = str(value).strip()
+    if re.fullmatch(r"\d+\.0+", raw):
+        raw = raw.split(".")[0]
+    parts = _PHONE_SPLIT.split(raw)
+    if len(parts) == 1 and re.fullmatch(r"(?:\+?960[\s-]?)?[3-9]\d{6}(?:\s+(?:\+?960[\s-]?)?[3-9]\d{6})+", raw):
+        parts = re.findall(r"(?:\+?960[\s-]?)?[3-9]\d{6}", raw)
+    numbers, notes = [], []
+    for part in parts:
+        number, note = normalize_phone(part)
+        if note:
+            notes.append(note)
+        if number and number not in numbers:
+            numbers.append(number)
+    return ", ".join(numbers), "; ".join(notes) or None
+
+
 def normalize_party(value):
     return clean_text(value).upper()
 

@@ -1,0 +1,92 @@
+{# The call form: phone buttons, outcome, comment, call-back time. `voter`, `outcomes`; optional back/island. #}
+{% from "_macros.html" import icon %}
+{% macro call_form(voter, outcomes, back='', island=none, queue=false) %}
+<div class="contact-wide">
+  {% for number in voter.phone|phones %}
+  <a class="button primary big" href="tel:{{ number }}">{{ icon('phone') }} Call {{ number }}</a>
+  {% endfor %}
+  {% set wa = whatsapp_url(voter) %}
+  {% if wa %}<a class="button big wa-wide" href="{{ wa }}" target="_blank" rel="noopener noreferrer">{{ icon('chat') }} WhatsApp</a>{% endif %}
+</div>
+<form class="card form call-form" method="post" action="{{ url_for('calls.log_call', national_id=voter.national_id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
+  {% if island is not none %}<input type="hidden" name="island" value="{{ island or no_island }}">{% endif %}
+  {% set nums = voter.phone|phones %}
+  {% if nums|length > 1 %}
+  <label>Number called
+    <select name="number">{% for n in nums %}<option>{{ n }}</option>{% endfor %}</select>
+  </label>
+  {% elif nums %}<input type="hidden" name="number" value="{{ nums[0] }}">{% endif %}
+  <fieldset class="segmented outcomes">
+    <legend>How did the call go?</legend>
+    {% for key, label in outcomes.items() %}
+    <label class="seg out-{{ key }}"><input type="radio" name="outcome" value="{{ key }}" required><span>{{ label }}</span></label>
+    {% endfor %}
+  </fieldset>
+  <label>Comment (what the voter said)
+    <textarea name="comment" rows="3" maxlength="1000" dir="auto" placeholder="e.g. Supports us, needs transport on voting day"></textarea>
+  </label>
+  <label>Call back at (only for "Call back later"; Maldives time)
+    <input type="datetime-local" name="callback_at">
+  </label>
+  <div class="actions">
+    <button class="primary big">{{ 'Save and next' if queue else 'Save call' }}</button>
+    {% if queue %}<button class="big" name="then" value="pause">Save and stop</button>{% endif %}
+  </div>
+</form>
+{% endmacro %}
+
+{% macro call_history(calls, outcomes) %}
+{% if calls %}
+<section class="card">
+  <h2>Earlier calls ({{ calls|length }})</h2>
+  <ol class="call-history">
+    {% for c in calls %}
+    <li>
+      <span class="tag out-tag-{{ c.outcome }}">{{ outcomes.get(c.outcome, c.outcome) }}</span>
+      <span class="muted small-text">{{ c.at|local }} · {{ c.username or '—' }}{% if c.number %} · <span class="mono">{{ c.number }}</span>{% endif %}{% if c.callback_at %} · call back {{ c.callback_at|local }}{% endif %}</span>
+      {% if c.comment %}<p dir="auto">{{ c.comment }}</p>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}
+{% endmacro %}
+
+{% macro voter_head(voter, island_label) %}
+<div class="profile-head">
+  <span class="avatar md initials" aria-hidden="true">{{ (voter.full_name or '?')[:1] }}</span>
+  <div>
+    <h1>{{ voter.full_name or '(no name)' }}</h1>
+    <p class="vcard-tags">
+      <span class="tag mono">{{ voter.national_id }}</span>
+      <span class="tag">{{ icon('pin', 12) }} {{ island_label(voter.island) }}</span>
+      {% if voter.lives_in and voter.lives_in != voter.island %}<span class="tag">Lives in {{ voter.lives_in }}</span>{% endif %}
+      {% if voter.attempts %}<span class="tag">{{ voter.attempts }} tr{{ 'ies' if voter.attempts != 1 else 'y' }}</span>{% endif %}
+    </p>
+  </div>
+</div>
+<dl class="facts">
+  <div><dt>House</dt><dd>{{ voter.house_name or '—' }}</dd></div>
+  {% if voter.address %}<div><dt>Address</dt><dd>{{ voter.address }}</dd></div>{% endif %}
+  <div><dt>Votes at</dt><dd>{{ voter.location or '—' }}{% if voter.box_code %} <span class="mono">({{ voter.box_code }})</span>{% endif %}</dd></div>
+  {% if voter.constituency %}<div><dt>Constituency</dt><dd>{{ voter.constituency }}</dd></div>{% endif %}
+  {% if voter.age is not none %}<div><dt>Age</dt><dd>{{ voter.age }}</dd></div>{% endif %}
+  {% if voter.callback_at %}<div><dt>Call back</dt><dd>{{ voter.callback_at|local }}</dd></div>{% endif %}
+</dl>
+{% endmacro %}
+
+{# Reachability bar: reached / refused / call back / hard + wrong; the rest is the track. #}
+{% macro reach_bar(r, size='') -%}
+{% set total = r.total or 0 %}
+<svg class="pbar {{ size }}" viewBox="0 0 100 10" preserveAspectRatio="none" role="img"
+     aria-label="{{ r.reached or 0 }} of {{ total }} reached">
+  {%- if total %}{% set ns = namespace(x=0) %}
+  {%- for key, cls, label in [('reached', 'seg-contacted', 'Reached'), ('refused', 'seg-refused', 'Refused'), ('callback', 'seg-followup', 'Call back'), ('hard', 'seg-noanswer', 'Hard to reach'), ('wrongnumber', 'seg-wrong', 'Wrong number')] %}
+  {%- set n = r[key] or 0 %}
+  {%- if n %}{% set w = 100 * n / total %}<rect class="{{ cls }}" x="{{ ns.x|round(3) }}" y="0" width="{{ w|round(3) }}" height="10"><title>{{ label }}: {{ n }} of {{ total }}</title></rect>{% set ns.x = ns.x + w %}{% endif %}
+  {%- endfor %}
+  {%- endif %}
+</svg>
+{%- endmacro %}

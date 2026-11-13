@@ -51,6 +51,15 @@
         <option value="(none)" {{ 'selected' if f.party == '(none)' }}>No party</option>
       </select>
     </label>
+    {% if islands|length > 1 %}
+    <label>Island
+      <select name="isl">
+        <option value="">Any</option>
+        {% for i in islands %}<option {{ 'selected' if f.isl == i }}>{{ i }}</option>{% endfor %}
+        <option value="(none)" {{ 'selected' if f.isl == '(none)' }}>No island</option>
+      </select>
+    </label>
+    {% endif %}
     <label>Location (where they vote)
       <select name="loc">
         <option value="">Any</option>
@@ -108,7 +117,7 @@
     {% endif %}
     <label>Sort by
       <select name="sort">
-        {% for key, label in [('name','Name'),('house','House'),('location','Location'),('age','Age'),('party','Party'),('id','ID')] %}
+        {% for key, label in [('name','Name'),('house','House'),('location','Location'),('age','Age'),('party','Party'),('id','ID')] + ([('island','Island')] if islands|length > 1 else []) %}
         <option value="{{ key }}" {{ 'selected' if f.sort == key }}>{{ label }}</option>
         {% endfor %}
       </select>
@@ -193,6 +202,7 @@
     {{ avatar(v, 'md') }}
     <div class="vcard-main">
       <a class="vcard-name" href="{{ url_for('voters.detail', national_id=v.national_id, back=back_url) }}">{{ v.full_name or '(no name)' }}</a>
+      {% if many_islands() and (v.island or v.lives_in) %}<p class="vcard-loc">{{ icon('pin', 14) }} <span>{{ v.island or '—' }}{% if v.lives_in and v.lives_in != v.island %} · lives in {{ v.lives_in }}{% endif %}</span></p>{% endif %}
       <p class="vcard-meta">{{ v.house_name or 'No house' }}{% if v.age is not none %} · {{ v.age }}{% endif %}{% if v.sex %} · {{ v.sex }}{% endif %}{% if v.phone %} · <span class="mono">{{ v.phone }}</span>{% endif %}</p>
       {% if v.location %}<p class="vcard-loc">{{ icon('pin', 14) }} <span>{{ v.location }}</span></p>{% endif %}
       <p class="vcard-tags">
@@ -226,7 +236,7 @@
         {% if wa %}<a class="wa" href="{{ wa }}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp {{ v.full_name }}" title="WhatsApp">{{ icon('chat', 18) }}</a>{% endif %}
         {% if vb %}<a class="viber" href="{{ vb }}" data-copy="{{ campaign_message(v, 'viber') }}" aria-label="Viber {{ v.full_name }}" title="Viber (message copied, paste it)">{{ icon('viber', 18) }}</a>{% endif %}
         {% if sms %}<a class="sms" href="{{ sms }}" aria-label="SMS {{ v.full_name }}" title="SMS">{{ icon('sms', 18) }}</a>{% endif %}
-        <a class="call" href="tel:{{ v.phone }}" aria-label="Call {{ v.full_name }}" title="Call">{{ icon('phone', 18) }}</a>
+        <a class="call" href="tel:{{ (v.phone|phones)[0] }}" aria-label="Call {{ v.full_name }}" title="Call">{{ icon('phone', 18) }}</a>
       </span>
       {% endif %}
     </form>

@@ -95,6 +95,22 @@
   <button class="primary">Save name</button>
 </form>
 
+<form class="card form" method="post" action="{{ url_for('campaign.set_features') }}" id="features">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2>Call centre and photos</h2>
+  <label class="check"><input type="checkbox" name="call_center" value="1" {{ 'checked' if call_center_on() }}>
+    <span><strong>Call centre</strong>: agents get a call list for their islands, record each call's outcome and
+    comment, and you get the reachability dashboard. Assign islands under <em>Calls → Islands</em>.</span></label>
+  <label class="check"><input type="checkbox" name="show_photos" value="1" {{ 'checked' if show_photos() }}>
+    <span><strong>Show photos</strong>: untick for a voter list without photos (cards show initials).</span></label>
+  {% for key, label, value, low, high in call_rules %}
+  <label>{{ label }}
+    <input type="number" name="{{ key }}" value="{{ value }}" min="{{ low }}" max="{{ high }}" inputmode="numeric">
+  </label>
+  {% endfor %}
+  <button class="primary">Save</button>
+</form>
+
 <form class="card form" method="post" action="{{ url_for('campaign.set_theme') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <h2>Portal colour</h2>

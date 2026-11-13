@@ -20,7 +20,7 @@
 
   {% if v.phone and not v.deceased %}
   <div class="contact-wide">
-    <a class="button primary big" href="tel:{{ v.phone }}">{{ icon('phone') }} Call {{ v.phone }}</a>
+    {% for number in v.phone|phones %}<a class="button primary big" href="tel:{{ number }}">{{ icon('phone') }} Call {{ number }}</a>{% endfor %}
     {% set wa = whatsapp_url(v) %}{% set sms = sms_url(v) %}{% set vb = viber_url(v) %}
     {% if wa %}<a class="button big wa-wide" href="{{ wa }}" target="_blank" rel="noopener noreferrer">{{ icon('chat') }} WhatsApp</a>{% endif %}
     {% if sms %}<a class="button big sms-wide" href="{{ sms }}">{{ icon('sms') }} SMS</a>{% endif %}
@@ -31,6 +31,9 @@
   </div>
   {% endif %}
 
+  {% if call_center_on() and (is_admin or v.island in my_call_islands()) %}
+  <p><a class="button" href="{{ url_for('calls.voter_page', national_id=v.national_id, back=request.full_path) }}">{{ icon('phone', 18) }} Calls for this voter</a></p>
+  {% endif %}
   <form class="canvass" method="post" action="{{ url_for('voters.canvass', national_id=v.national_id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="back" value="{{ request.full_path.rstrip('?') }}">
@@ -130,7 +133,12 @@
     <div><dt>Party</dt><dd>{{ v.party or '—' }}</dd></div>
     <div><dt>Location</dt><dd>{{ v.location or '—' }}</dd></div>
     {% if v.full_name_dv or v.house_name_dv %}<div><dt>Dhivehi</dt><dd class="thaana" lang="dv" dir="rtl">{{ v.full_name_dv }}{% if v.house_name_dv %} · {{ v.house_name_dv }}{% endif %}</dd></div>{% endif %}
-    <div><dt>Phone</dt><dd class="mono">{% if v.phone %}<a href="tel:{{ v.phone }}">{{ v.phone }}</a>{% else %}—{% endif %}</dd></div>
+    <div><dt>Phone</dt><dd class="mono">{% for number in v.phone|phones %}<a href="tel:{{ number }}">{{ number }}</a>{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd></div>
+    {% if v.island or v.atoll %}<div><dt>Island</dt><dd>{{ v.atoll ~ '. ' if v.atoll }}{{ v.island or '—' }}</dd></div>{% endif %}
+    {% if v.lives_in %}<div><dt>Lives in</dt><dd>{{ v.lives_in }}</dd></div>{% endif %}
+    {% if v.address %}<div><dt>Address</dt><dd>{{ v.address }}</dd></div>{% endif %}
+    {% if v.constituency %}<div><dt>Constituency</dt><dd>{{ v.constituency }}</dd></div>{% endif %}
+    {% if v.box_code %}<div><dt>Box code</dt><dd class="mono">{{ v.box_code }}</dd></div>{% endif %}
     <div><dt>ID card</dt><dd class="mono">{{ v.national_id }}</dd></div>
     {% if not is_admin and current_user.role == 'user' %}
     <div><dt>Agent</dt><dd>{{ assigned.username if assigned else (house_agent.username if house_agent else '—') }}</dd></div>

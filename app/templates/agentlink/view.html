@@ -22,7 +22,7 @@
         <div>
           <strong>{{ v.full_name }}</strong>{% if v.deceased %} <span class="badge">deceased</span>{% endif %}
           {% if v.full_name_dv %}<br><span class="muted" dir="rtl">{{ v.full_name_dv }}</span>{% endif %}
-          <p class="small-text">{% if v.phone %}<a href="tel:{{ v.phone }}" class="mono">{{ v.phone }}</a>{% else %}<span class="muted">No phone</span>{% endif %}
+          <p class="small-text">{% if v.phone %}<a href="tel:{{ (v.phone|phones)[0] }}" class="mono">{{ v.phone }}</a>{% else %}<span class="muted">No phone</span>{% endif %}
             {% if v.location %}<span class="muted"> · {{ v.location }}</span>{% endif %}</p>
         </div>
         <span class="badge st-tag-{{ v.status }}">{{ statuses.get(v.status, v.status) }}</span>

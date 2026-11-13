@@ -28,6 +28,42 @@ What differs per candidate, and where it's set:
 
 See [Many candidates on one VPS](#many-candidates-on-one-vps) for setup.
 
+## Call centre (reachability campaigns)
+
+For a candidate whose main work is phoning voters across **several islands** (e.g. GDh ZR). Turn it on
+under **Settings → Call centre and photos** (untick *Show photos* if the list has none). Your one-island
+portal keeps this off and doesn't change.
+
+**Setup (admin)**
+1. **Import** the voter list. These headers are read as they are:
+   `nationalID, DisplayName, House, Address, Phone, LivesIn, Atoll, Island, Constituency, BoxName, BoxCode`
+   (a Phone cell may hold several numbers: `7771234 / 9991234`).
+2. **Users**: add each call agent (a *user*, or an *agent* given a sign-in) and hand them their password.
+3. **Calls → Islands**: tick which agents call each island. One agent can have several islands.
+
+**Agents** sign in straight to **Calls**: the next voter of their islands, a **Call** button per number,
+then one tap for the outcome (**Reached · No answer · Switched off · Wrong number · Call back later ·
+Refused**), a comment, and **Save and next**.
+- The voter on screen is held for that agent (10 min by default) so two agents never ring the same person.
+- *Call back later* takes a time; the voter comes back to the top of the list when it's due.
+- *No answer* / *Switched off* come back after the retry gap (60 min) until the try limit (3);
+  then the voter counts as **hard to reach**. *Reached*, *Refused* and *Wrong number* end the calls
+  (the admin can put a voter back).
+- Every call is logged (who, when, number, outcome, comment) and also sets the voter's canvassing
+  status and note, so search, the voter page and exports show it.
+
+**The candidate (admin)** gets:
+- **Reachability**: % reached overall and per island, called at least once, call-backs due, hard to
+  reach, wrong numbers, never tried, no phone; each number opens the list of those voters (CSV export).
+  Plus calls per day for 14 days and every agent's calls and reached today / this week.
+- **Comments**: every call comment, newest first, filtered by island, agent, outcome, date or text, with
+  CSV export.
+- Search gets an **Island** filter and sort; cards show the island and where the voter lives now.
+
+Try limit, retry gap and hold time are under **Settings**. A new candidate can start with it on:
+add `VOTER_PORTAL_CALL_CENTER=1` and `VOTER_PORTAL_SHOW_PHOTOS=0` to `candidates/<slug>/.env`
+before the first start.
+
 ## Roles
 
 | | Admin | User |

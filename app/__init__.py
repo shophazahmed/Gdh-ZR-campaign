@@ -7,8 +7,9 @@ import click
 from flask import Flask, g, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from . import admin, agentlink, announce, auth, campaign, canvass, confirmed, fonts, imports, personal, share, voters
+from . import admin, agentlink, announce, auth, calls, campaign, canvass, confirmed, fonts, imports, personal, share, voters
 from .db import close_db, connect, init_schema, now_iso
+from .normalize import split_phones
 
 CSP = (
     "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
@@ -69,9 +70,12 @@ def create_app(test_config=None):
     app.register_blueprint(fonts.bp)
     app.register_blueprint(announce.bp)
     app.register_blueprint(agentlink.bp)
+    app.register_blueprint(calls.bp)
     app.jinja_env.globals["dhivehi_font"] = fonts.font_file
     app.jinja_env.globals["dhivehi_font_name"] = fonts.font_name
     app.jinja_env.globals["share_people"] = share.people
+    app.jinja_env.filters["phones"] = split_phones
+    app.jinja_env.globals["my_call_islands"] = calls.my_islands
 
     @app.template_filter("local")
     def local_time(value):
@@ -93,7 +97,9 @@ def create_app(test_config=None):
                 "confirmed_metrics": confirmed.metrics,
                 "campaign_banner": campaign.banner, "whatsapp_url": campaign.whatsapp_url,
                 "sms_url": campaign.sms_url, "viber_url": campaign.viber_url, "campaign_message": campaign.message,
-                "picture_token": campaign.picture_token, "theme_name": campaign.theme_name, "campaign_name": campaign.campaign_name, "themes": campaign.THEMES,
+                "picture_token": campaign.picture_token, "theme_name": campaign.theme_name, "campaign_name": campaign.campaign_name,
+                "show_photos": campaign.show_photos, "call_center_on": campaign.call_center_on,
+                "many_islands": campaign.many_islands, "themes": campaign.THEMES,
                 "appearance": campaign.appearance, "urgent_notice": announce.banner}
 
     @app.after_request
@@ -132,6 +138,7 @@ def create_app(test_config=None):
         campaign.init_schema(conn)
         announce.init_schema(conn)
         agentlink.init_schema(conn)
+        calls.init_schema(conn)
         bootstrap_admin(conn)
         conn.close()
     return app

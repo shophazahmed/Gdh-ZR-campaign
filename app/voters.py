@@ -23,14 +23,15 @@ from flask import (
 from . import audit, campaign, personal
 from .auth import admin_required, can_view_confirmed, is_admin, is_owner, login_required
 from .db import get_db, now_iso
-from .normalize import clean_text, normalize_age, normalize_id, normalize_party, normalize_phone, normalize_sex
+from .normalize import clean_text, normalize_age, normalize_id, normalize_party, normalize_phones, normalize_sex
 
 bp = Blueprint("voters", __name__)
 
 PAGE_SIZE = 50
 PAGE_SIZES = (25, 50, 100, 200)
+PLACE_FIELDS = ("island", "atoll", "lives_in", "address", "constituency", "box_code")
 FIELDS = ("national_id", "full_name", "sex", "age", "house_name", "party", "phone", "location", "deceased",
-          "full_name_dv", "house_name_dv")
+          "full_name_dv", "house_name_dv") + PLACE_FIELDS
 SORTS = {
     "name": "full_name COLLATE NOCASE, national_id",
     "house": "house_name COLLATE NOCASE, full_name COLLATE NOCASE",
@@ -38,6 +39,7 @@ SORTS = {
     "id": "national_id",
     "party": "party, full_name COLLATE NOCASE",
     "location": "location = '', location COLLATE NOCASE, house_name COLLATE NOCASE, full_name COLLATE NOCASE",
+    "island": "island = '', island COLLATE NOCASE, house_name COLLATE NOCASE, full_name COLLATE NOCASE",
 }
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
 STATUSES = {"new": "Not contacted", "contacted": "Contacted", "followup": "Follow up", "noanswer": "No answer"}
@@ -63,6 +65,7 @@ def read_filters(args):
         "h": clean_text(args.get("h", ""))[:200],
         "party": clean_text(args.get("party", ""))[:50],
         "loc": clean_text(args.get("loc", ""))[:200],
+        "isl": clean_text(args.get("isl", ""))[:200],
         "sex": args.get("sex", "") if args.get("sex", "") in ("M", "F", "unknown") else "",
         "age_min": int_or_none("age_min"),
         "age_max": int_or_none("age_max"),
@@ -121,9 +124,10 @@ def build_where(f):
         clauses.append(
             "(full_name LIKE ? ESCAPE '\\' OR national_id LIKE ? ESCAPE '\\' OR house_name LIKE ? ESCAPE '\\'"
             " OR phone LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\' OR full_name_dv LIKE ? ESCAPE '\\'"
-            " OR house_name_dv LIKE ? ESCAPE '\\')"
+            " OR house_name_dv LIKE ? ESCAPE '\\' OR island LIKE ? ESCAPE '\\' OR lives_in LIKE ? ESCAPE '\\'"
+            " OR address LIKE ? ESCAPE '\\')"
         )
-        params += [_like(f["q"])] * 7
+        params += [_like(f["q"])] * 10
     if f["national_id"]:
         clauses.append("national_id LIKE ? ESCAPE '\\'")
         params.append(_like(f["national_id"]))
@@ -136,6 +140,12 @@ def build_where(f):
         else:
             clauses.append("location = ?")
             params.append(f["loc"])
+    if f.get("isl"):
+        if f["isl"] == "(none)":
+            clauses.append("island = ''")
+        else:
+            clauses.append("island = ?")
+            params.append(f["isl"])
     if f["party"]:
         if f["party"] == "(none)":
             clauses.append("party = ''")
@@ -211,6 +221,9 @@ def search():
     w, p = scoped(" WHERE location != ''")
     locations = [r[0] for r in db.execute(
         f"SELECT DISTINCT location FROM voters{w} ORDER BY location COLLATE NOCASE", p)]
+    w, p = scoped(" WHERE island != ''")
+    islands = [r[0] for r in db.execute(
+        f"SELECT DISTINCT island FROM voters{w} ORDER BY island COLLATE NOCASE", p)]
     w, p = scoped(" WHERE house_name != ''")
     houses = [r[0] for r in db.execute(
         f"SELECT DISTINCT house_name FROM voters{w} ORDER BY house_name COLLATE NOCASE", p)]
@@ -241,6 +254,7 @@ def search():
         pages=pages,
         parties=parties,
         locations=locations,
+        islands=islands,
         houses=houses,
         stats=stats,
         query_args=query_args,
@@ -293,6 +307,7 @@ def filter_chips(f, query_args):
         "h": lambda v: f"🏠 {v}",
         "party": lambda v: "No party" if v == "(none)" else v,
         "loc": lambda v: "No location" if v == "(none)" else f"📍 {v}",
+        "isl": lambda v: "No island" if v == "(none)" else f"🏝 {v}",
         "sex": lambda v: {"M": "Male", "F": "Female", "unknown": "Sex not recorded"}[v],
         "age_min": lambda v: f"Age ≥ {v}",
         "age_max": lambda v: f"Age ≤ {v}",
@@ -556,9 +571,11 @@ def _parse_form(form, creating):
     data["deceased"] = 1 if form.get("deceased") else 0
     data["full_name_dv"] = clean_text(form.get("full_name_dv", ""))[:200]
     data["house_name_dv"] = clean_text(form.get("house_name_dv", ""))[:200]
-    data["phone"], note = normalize_phone(form.get("phone", ""))
+    data["phone"], note = normalize_phones(form.get("phone", ""))
     if note and "unreadable" in note:
-        errors.append("Phone must be a number such as 7771234.")
+        errors.append("Phone must be a number such as 7771234 (several: 7771234, 9991234).")
+    for name in PLACE_FIELDS:
+        data[name] = clean_text(form.get(name, ""))[:200]
     return data, errors
 
 
@@ -606,10 +623,12 @@ def create():
         stamp = now_iso()
         db.execute(
             "INSERT INTO voters (national_id, full_name, sex, age, house_name, party, phone, location, deceased,"
-            " full_name_dv, house_name_dv, photo_path, source, created_at, updated_at, updated_by)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?)",
+            " full_name_dv, house_name_dv, photo_path, source, created_at, updated_at, updated_by, "
+            + ", ".join(PLACE_FIELDS) + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?"
+            + ", ?" * len(PLACE_FIELDS) + ")",
             (data["national_id"], data["full_name"], data["sex"], data["age"], data["house_name"],
-             data["party"], data["phone"], data["location"], data["deceased"], data["full_name_dv"], data["house_name_dv"], data.get("photo_path"), stamp, stamp, g.user["id"]),
+             data["party"], data["phone"], data["location"], data["deceased"], data["full_name_dv"], data["house_name_dv"],
+             data.get("photo_path"), stamp, stamp, g.user["id"], *(data[k] for k in PLACE_FIELDS)),
         )
         audit.log("voter_create", target=data["national_id"], detail={k: data[k] for k in FIELDS}, commit=False)
         db.commit()
@@ -676,7 +695,8 @@ def delete(national_id):
 EXPORT_HEADERS = ["#", "ID", "Full name", "Sex", "Age", "House name", "Party", "Phone", "Has photo",
                   "Agent", "Agent via", "Status", "Status changed", "Status by", "Notes",
                   "Last edited", "Last edited by", "Location", "Deceased",
-                  "Name (Dhivehi)", "House (Dhivehi)"]
+                  "Name (Dhivehi)", "House (Dhivehi)",
+                  "Island", "Atoll", "Lives in", "Address", "Constituency", "Box code"]
 
 # The agent responsible for a voter: the one they were handed to individually, else their house's agent
 EXPORT_AGENT = (
@@ -769,6 +789,7 @@ def export(fmt):
          _local(r["updated_at"]) if r["updated_by"] else "",
          _safe_cell(r["updated_by_name"] or ""), _safe_cell(r["location"]),
          "yes" if r["deceased"] else "", _safe_cell(r["full_name_dv"]), _safe_cell(r["house_name_dv"])]
+        + [_safe_cell(r[k]) for k in PLACE_FIELDS]
         + (["yes" if r["confirmed_at"] else "", _local(r["confirmed_at"])] if owner else [])
         for n, r in enumerate(rows, 1)
     ]

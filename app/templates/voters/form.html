@@ -42,15 +42,30 @@
     <input name="location" value="{{ v.location or '' }}" maxlength="200" list="locations">
     <datalist id="locations">{% for l in locations or [] %}<option value="{{ l }}">{% endfor %}</datalist>
   </label>
-  <label>Phone
-    <input name="phone" type="tel" value="{{ v.phone or '' }}" maxlength="20" placeholder="7771234" inputmode="tel">
+  <label>Phone (several: separate with commas)
+    <input name="phone" type="tel" value="{{ v.phone or '' }}" maxlength="60" placeholder="7771234, 9991234" inputmode="tel">
   </label>
+  <div class="row">
+    <label>Island <input name="island" value="{{ v.island or '' }}" maxlength="200" list="islands"></label>
+    <label>Atoll <input name="atoll" value="{{ v.atoll or '' }}" maxlength="200"></label>
+  </div>
+  <datalist id="islands">{% for i in islands or [] %}<option value="{{ i }}">{% endfor %}</datalist>
+  <div class="row">
+    <label>Lives in (now) <input name="lives_in" value="{{ v.lives_in or '' }}" maxlength="200"></label>
+    <label>Constituency <input name="constituency" value="{{ v.constituency or '' }}" maxlength="200"></label>
+  </div>
+  <div class="row">
+    <label>Address <input name="address" value="{{ v.address or '' }}" maxlength="200"></label>
+    <label>Box code <input name="box_code" value="{{ v.box_code or '' }}" maxlength="200"></label>
+  </div>
   <label class="check"><input type="checkbox" name="deceased" value="1" {{ 'checked' if v.deceased }}> Deceased (kept on the list, no call or message buttons)</label>
+  {% if show_photos() %}
   <label>Photo (JPEG, PNG or WebP, up to 5 MB)
     <input name="photo" type="file" accept="image/jpeg,image/png,image/webp">
   </label>
   {% if not creating and v.photo_path %}
   <label class="check">{{ avatar(v) }} <input type="checkbox" name="remove_photo" value="1"> Remove current photo</label>
+  {% endif %}
   {% endif %}
   <div class="actions">
     <button class="primary">{{ 'Add voter' if creating else 'Save changes' }}</button>

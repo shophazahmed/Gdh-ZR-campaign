@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "calls/_form.html" import call_form, call_history, voter_head with context %}
+{% block title %}Calls · {{ voter.full_name }}{% endblock %}
+{% block content %}
+<a class="backlink" href="{{ back if back.startswith('/') and not back.startswith('//') else url_for('voters.detail', national_id=voter.national_id) }}">{{ icon('back', 18) }} Back</a>
+<article class="card profile">
+  {{ voter_head(voter, island_label) }}
+  {% if voter.done %}
+  <p class="flash flash-info">Finished: {{ outcomes.get(voter.last_outcome, voter.last_outcome) }}. This voter is no longer in the call queue.</p>
+  {% if is_admin %}
+  <form method="post" action="{{ url_for('calls.reopen', national_id=voter.national_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="small">Put back in the call queue</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</article>
+{% if voter.phone %}{{ call_form(voter, outcomes, back=request.full_path.rstrip('?')) }}{% else %}<div class="empty card"><p>No phone number for this voter.</p></div>{% endif %}
+{{ call_history(calls, outcomes) }}
+{% endblock %}

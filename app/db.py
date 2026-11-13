@@ -146,6 +146,13 @@ def init_schema(conn):
         ("deceased", "deceased INTEGER NOT NULL DEFAULT 0"),
         ("full_name_dv", "full_name_dv TEXT NOT NULL DEFAULT ''"),
         ("house_name_dv", "house_name_dv TEXT NOT NULL DEFAULT ''"),
+        # Several islands per campaign (call centre); all blank for a one-island portal
+        ("island", "island TEXT NOT NULL DEFAULT ''"),
+        ("atoll", "atoll TEXT NOT NULL DEFAULT ''"),
+        ("lives_in", "lives_in TEXT NOT NULL DEFAULT ''"),       # where the voter lives now (e.g. Male')
+        ("address", "address TEXT NOT NULL DEFAULT ''"),
+        ("constituency", "constituency TEXT NOT NULL DEFAULT ''"),
+        ("box_code", "box_code TEXT NOT NULL DEFAULT ''"),       # ballot box code; the box name is 'location'
     ):
         if name not in columns:
             try:
@@ -155,6 +162,7 @@ def init_schema(conn):
                 if "duplicate column" not in str(exc):
                     raise
     conn.execute("CREATE INDEX IF NOT EXISTS ix_voters_status ON voters (status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_voters_island ON voters (island)")
     _add_user_columns(conn)
     conn.commit()
 

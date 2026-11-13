@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}{{ states[state] }}{% endblock %}
+{% block content %}
+<a class="backlink" href="{{ url_for('calls.dashboard') }}">{{ icon('back', 18) }} Dashboard</a>
+<div class="page-head">
+  <h1>{{ states[state] }}{% if island is not none %} · {{ island_label('' if island == no_island else island) }}{% endif %}</h1>
+  <p class="muted">{{ rows|length }} voter{{ 's' if rows|length != 1 }}</p>
+  <a class="button small" href="{{ url_for('calls.by_state', state=state, island=island, format='csv') }}">{{ icon('download', 16) }} Export CSV</a>
+</div>
+{% if rows %}
+<div class="table-wrap">
+<table class="stack">
+  <thead><tr><th>Voter</th><th>Island</th><th>Phone</th><th>Tries</th><th>Last call</th><th>Last comment</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td data-label="Voter"><a href="{{ url_for('calls.voter_page', national_id=r.national_id, back=request.full_path) }}">{{ r.full_name }}</a> <span class="mono muted small-text">{{ r.national_id }}</span></td>
+    <td data-label="Island">{{ island_label(r.island) }}{% if r.lives_in and r.lives_in != r.island %} <span class="muted small-text">lives in {{ r.lives_in }}</span>{% endif %}</td>
+    <td data-label="Phone" class="mono">{{ r.phone or '—' }}</td>
+    <td data-label="Tries">{{ r.attempts or 0 }}</td>
+    <td data-label="Last call">{% if r.last_at %}{{ outcomes.get(r.last_outcome, '') }} · {{ r.last_at|local }}{% else %}—{% endif %}{% if r.callback_at %}<br><span class="small-text">call back {{ r.callback_at|local }}</span>{% endif %}</td>
+    <td data-label="Last comment" class="detail" dir="auto">{{ r.last_comment or '' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}<div class="empty card"><p>Nobody here.</p></div>{% endif %}
+{% endblock %}

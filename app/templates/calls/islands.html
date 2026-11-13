@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Islands{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Islands and agents</h1>
+  <p class="muted">Tick who calls each island. An agent can have several islands, and an island several agents.
+    Agents need a sign-in: add them under <a href="{{ url_for('admin.users') }}">Users</a> (a user, or an agent given a sign-in).</p>
+</div>
+{% if not agents %}
+<div class="empty card"><p>No agents with a sign-in yet. <a href="{{ url_for('admin.users') }}">Add one under Users</a>.</p></div>
+{% endif %}
+{% for r in rows %}
+{% set mine = assigned.get(r.island, []) %}
+<form class="card form island-card" method="post" id="isl-{{ anchor(r.island) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="island" value="{{ r.island or no_island }}">
+  <h2>{{ island_label(r.island) }}</h2>
+  <p class="muted">{{ r.voters }} voters · {{ r.with_phone }} with a phone number · {{ mine|length }} agent{{ 's' if mine|length != 1 }}</p>
+  {% if agents %}
+  <fieldset class="checks">
+    <legend class="sr-only">Agents for {{ island_label(r.island) }}</legend>
+    {% for a in agents %}
+    <label class="check"><input type="checkbox" name="agents" value="{{ a.id }}" {{ 'checked' if a.id in mine }}>
+      <span>{{ a.username }}{% if not a.is_active %} <span class="muted">(inactive)</span>{% endif %}</span></label>
+    {% endfor %}
+  </fieldset>
+  <button class="primary">Save {{ island_label(r.island) }}</button>
+  {% endif %}
+</form>
+{% else %}
+<div class="empty card"><p>No voters yet. <a href="{{ url_for('imports.index') }}">Import the voter list</a> first.</p></div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, range_picker %}
+{% block title %}Call comments{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Comments</h1>
+  <p class="muted">{{ total }} call{{ 's' if total != 1 }}{% if rng.label %} · {{ rng.label }}{% endif %}</p>
+  <a class="button small" href="{{ url_for('calls.export', **args) }}">{{ icon('download', 16) }} Export CSV</a>
+</div>
+
+{{ range_picker(rng, 'calls.comments', args) }}
+
+<form class="card filters" method="get">
+  {% if rng.from %}<input type="hidden" name="from" value="{{ rng.from }}">{% endif %}
+  {% if rng.to %}<input type="hidden" name="to" value="{{ rng.to }}">{% endif %}
+  <label>Search <input type="search" name="q" value="{{ f.q }}" placeholder="Comment, name or ID"></label>
+  <label>Island
+    <select name="island" data-autosubmit>
+      <option value="">All islands</option>
+      {% for i in islands %}{% set v = i or no_island %}<option value="{{ v }}" {{ 'selected' if f.island == v }}>{{ island_label(i) }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Agent
+    <select name="agent" data-autosubmit>
+      <option value="">Everyone</option>
+      {% for a in agents %}<option value="{{ a.id }}" {{ 'selected' if f.agent == a.id|string }}>{{ a.username }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Outcome
+    <select name="outcome" data-autosubmit>
+      <option value="">Any</option>
+      {% for k, label in outcomes.items() %}<option value="{{ k }}" {{ 'selected' if f.outcome == k }}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="check"><input type="checkbox" name="only" value="0" {{ 'checked' if f.only == '0' }} data-autosubmit> Include calls without a comment</label>
+  <button class="primary">Apply</button>
+</form>
+
+{% if rows %}
+<ol class="call-history card">
+  {% for c in rows %}
+  <li>
+    <a href="{{ url_for('calls.voter_page', national_id=c.national_id, back=request.full_path) }}"><strong>{{ c.full_name }}</strong></a>
+    <span class="tag out-tag-{{ c.outcome }}">{{ outcomes.get(c.outcome, c.outcome) }}</span>
+    <span class="muted small-text">{{ island_label(c.island) }}{% if c.lives_in and c.lives_in != c.island %} (lives in {{ c.lives_in }}){% endif %} · {{ c.username or '—' }} · {{ c.at|local }}{% if c.callback_at %} · call back {{ c.callback_at|local }}{% endif %}</span>
+    {% if c.comment %}<p dir="auto">{{ c.comment }}</p>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a class="button small" href="{{ url_for('calls.comments', page=page - 1, **args) }}">Newer</a>{% else %}<span></span>{% endif %}
+  <span class="muted">Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a class="button small" href="{{ url_for('calls.comments', page=page + 1, **args) }}">Older</a>{% else %}<span></span>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<div class="empty card"><p>No calls match.</p></div>
+{% endif %}
+{% endblock %}

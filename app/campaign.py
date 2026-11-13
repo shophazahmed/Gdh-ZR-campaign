@@ -17,6 +17,7 @@ from flask import (Blueprint, Response, abort, current_app, flash, g, redirect, 
 from . import audit
 from .auth import admin_required
 from .db import get_db, now_iso
+from .normalize import split_phones
 
 bp = Blueprint("campaign", __name__, url_prefix="/admin")
 
@@ -100,9 +101,51 @@ def put_setting(key, value):
     g.get("settings_cache", {}).pop(key, None)
 
 
+def _env_default(name, default):
+    return "1" if os.environ.get(name, default).strip().lower() in ("1", "true", "yes", "on") else "0"
+
+
+def show_photos():
+    """Photo spaces on cards, voter pages and the edit form. Off for campaigns without photos."""
+    return get_setting("show_photos", _env_default("VOTER_PORTAL_SHOW_PHOTOS", "1")) == "1"
+
+
+def call_center_on():
+    """Call-centre mode: agents work a call queue for their islands (see calls.py)."""
+    return get_setting("call_center", _env_default("VOTER_PORTAL_CALL_CENTER", "0")) == "1"
+
+
+# Call-centre rules: (setting key, label, default, min, max)
+CALL_RULES = (
+    ("call_max_attempts", "Tries before a voter counts as hard to reach", 3, 1, 10),
+    ("call_retry_minutes", "Minutes before the same voter is tried again", 60, 0, 1440),
+    ("call_hold_minutes", "Minutes a voter stays with the agent who opened them", 10, 1, 120),
+)
+
+
+def call_rule(key):
+    for k, _, default, low, high in CALL_RULES:
+        if k == key:
+            try:
+                return max(low, min(high, int(get_setting(key, default))))
+            except (TypeError, ValueError):
+                return default
+    raise KeyError(key)
+
+
+def many_islands():
+    """True when the voters come from more than one island: island filters and labels appear."""
+    if "many_islands" not in g:
+        g.many_islands = get_db().execute(
+            "SELECT COUNT(*) FROM (SELECT DISTINCT island FROM voters WHERE island != '' LIMIT 2)").fetchone()[0] > 1
+    return g.many_islands
+
+
 def _mobile_number(voter):
-    """International number for a voter's mobile phone, or None for landlines and junk."""
-    digits = re.sub(r"\D", "", voter["phone"] or "")
+    """International number for a voter's (first) mobile phone, or None for landlines and junk."""
+    numbers = split_phones(voter["phone"] or "")
+    mobile = next((n for n in numbers if re.fullmatch(r"(?:960)?[79]\d{6}", re.sub(r"\D", "", n))), None)
+    digits = re.sub(r"\D", "", mobile or (numbers[0] if numbers else ""))
     if re.fullmatch(r"[79]\d{6}", digits):
         return "960" + digits
     if 10 <= len(digits) <= 15 and not digits.startswith("960"):
@@ -252,7 +295,8 @@ def settings():
                            templates={c: template_for(c) for c in CHANNELS}, channels=CHANNELS,
                            own_template={c: get_setting(f"{c}_template") is not None for c in CHANNELS},
                            picture=picture_token(), picture_link=get_setting("picture_link", "1") == "1",
-                           themes=THEMES, theme=theme_name())
+                           themes=THEMES, theme=theme_name(), call_rules=[(k, label, call_rule(k), low, high)
+                                                                          for k, label, _, low, high in CALL_RULES])
 
 
 @bp.post("/view-all")
@@ -276,6 +320,25 @@ def set_name():
     else:
         flash("Type a campaign name.", "error")
     return redirect(url_for("campaign.settings") + "#name")
+
+
+@bp.post("/features")
+@admin_required
+def set_features():
+    changes = {}
+    for key in ("call_center", "show_photos"):
+        changes[key] = "1" if request.form.get(key) else "0"
+    for key, _, default, low, high in CALL_RULES:
+        try:
+            changes[key] = str(max(low, min(high, int(request.form.get(key, default)))))
+        except ValueError:
+            changes[key] = str(default)
+    for key, value in changes.items():
+        put_setting(key, value)
+    audit.log("features", detail=changes, commit=False)
+    get_db().commit()
+    flash("Call centre and photo settings saved.", "success")
+    return redirect(url_for("campaign.settings") + "#features")
 
 
 @bp.post("/theme")

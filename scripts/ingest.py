@@ -57,6 +57,7 @@ from app.normalize import (  # noqa: E402
     normalize_id,
     normalize_party,
     normalize_phone,
+    normalize_phones,
     normalize_sex,
 )
 
@@ -80,24 +81,32 @@ LEFT_MDP_PARTY = "OTHER"
 def is_mdp(party):
     return compare_key(party) in {"mdp", "mpd", "maldiviandemocraticparty"}
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
-FIELDS = ("full_name", "sex", "age", "house_name", "party", "phone", "location", "full_name_dv", "house_name_dv")
+FIELDS = ("full_name", "sex", "age", "house_name", "party", "phone", "location", "full_name_dv", "house_name_dv",
+          "island", "atoll", "lives_in", "address", "constituency", "box_code")
+TEXT_FIELDS = ("island", "atoll", "lives_in", "address", "constituency", "box_code")
 
 # Header names, compared after lower-casing and removing everything but letters/digits.
 ALIASES = {
     "national_id": {"id", "idcard", "idcardno", "idcardnumber", "idno", "idnumber", "nid", "nationalid",
                     "nationalidcard", "nationalidno", "nationalidnumber", "identitycard", "identitycardno",
                     "nic", "idcardnum", "voterid"},
-    "full_name": {"name", "fullname", "votername", "nameofvoter", "names", "englishname", "fullnameenglish",
+    "full_name": {"name", "fullname", "displayname", "votername", "nameofvoter", "names", "englishname", "fullnameenglish",
                   "nameenglish", "voter"},
     "sex": {"sex", "gender", "mf"},
     "age": {"age", "ages", "ageyears", "ageyrs"},
     "dob": {"dob", "dateofbirth", "birthdate", "birthday"},
-    "house_name": {"house", "housename", "address", "houseaddress", "permanentaddress", "home", "residence",
+    "house_name": {"house", "housename", "houseaddress", "permanentaddress", "home", "residence",
                    "housenameaddress", "homename"},
     "full_name_dv": {"dhivehiname", "namedhivehi", "divehiname", "namedivehi", "thaananame", "nameindhivehi"},
     "house_name_dv": {"dhivehihouse", "housedhivehi", "divehihouse", "dhivehihousename", "housenamedhivehi"},
-    "location": {"location", "ballotbox", "box", "boxlocation", "votinglocation", "votingplace", "pollingstation",
+    "location": {"location", "ballotbox", "box", "boxname", "ballotboxname", "boxlocation", "votinglocation", "votingplace", "pollingstation",
                  "registeredlocation", "registeredat"},
+    "island": {"island", "islandname", "registeredisland", "homeisland", "votingisland"},
+    "atoll": {"atoll", "atollname"},
+    "lives_in": {"livesin", "livingin", "residesin", "residingin", "currentisland", "presentisland", "livesat"},
+    "address": {"address", "currentaddress", "presentaddress", "fulladdress"},
+    "constituency": {"constituency", "constituencyname", "dhaairaa", "dhaaira"},
+    "box_code": {"boxcode", "boxno", "boxnumber", "ballotboxcode", "ballotboxno", "boxid"},
     "party": {"party", "partyname", "politicalparty", "affiliation", "partyaffiliation"},
     "phone": {"phone", "phoneno", "phonenumber", "mobile", "mobileno", "mobilenumber", "contact", "contactno",
               "contactnumber", "tel", "telephone", "mob"},
@@ -251,6 +260,8 @@ def find_header(rows, scan=30):
             # Two "Party" columns (old / updated): take the newest-sounding one.
             fresh = [c for c in cols if any(w in header_key(row[c]) for w in NEWER_WORDS)]
             roles[role] = (fresh or cols)[0]
+        if "address" in roles and "house_name" not in roles:
+            roles["house_name"] = roles.pop("address")
         if len(roles) >= 2 and len(roles) > len(best[1]):
             best = (i, roles)
     return best
@@ -410,7 +421,8 @@ def extract(path, priority, label, log, finder):
                       "full_name_dv": clean_text(cell(row, "full_name_dv")),
                       "house_name_dv": clean_text(cell(row, "house_name_dv")),
                       "party": normalize_party(cell(row, "party"))}
-            values["phone"], note = normalize_phone(cell(row, "phone"))
+            values.update({f: clean_text(cell(row, f))[:200] for f in TEXT_FIELDS})
+            values["phone"], note = normalize_phones(cell(row, "phone"))
             if note:
                 log.add("INFO", "ODD_PHONE", nid, f"{where}: {note}")
             if label == MDP_LIST_SOURCE and "party" not in roles:
@@ -639,10 +651,11 @@ def load(conn, merged, mode, log):
         if existing is None:
             conn.execute(
                 "INSERT INTO voters (national_id, full_name, sex, age, house_name, party, phone, location, full_name_dv,"
-                " house_name_dv, photo_path, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " house_name_dv, photo_path, source, created_at, updated_at, " + ", ".join(TEXT_FIELDS) + ")"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" + ", ?" * len(TEXT_FIELDS) + ")",
                 (nid, v["full_name"], v["sex"], v["age"], v["house_name"], v["party"], v["phone"], v["location"],
                  v["full_name_dv"], v["house_name_dv"],
-                 v["photo_path"], src, stamp, stamp),
+                 v["photo_path"], src, stamp, stamp, *(v.get(f, "") for f in TEXT_FIELDS)),
             )
             counts["inserted"] += 1
         elif mode != "replace" and (existing["updated_by"] is not None or existing["source"] == "manual"):
@@ -656,12 +669,13 @@ def load(conn, merged, mode, log):
                 " party = COALESCE(NULLIF(?, ''), party),"
                 " phone = COALESCE(NULLIF(?, ''), phone), location = COALESCE(NULLIF(?, ''), location),"
                 " full_name_dv = COALESCE(NULLIF(?, ''), full_name_dv), house_name_dv = COALESCE(NULLIF(?, ''), house_name_dv),"
-                " photo_path = COALESCE(?, photo_path), source = ?, updated_at = ?, updated_by = NULL"
+                " photo_path = COALESCE(?, photo_path), source = ?, updated_at = ?, updated_by = NULL, "
+                + ", ".join(f"{f} = COALESCE(NULLIF(?, ''), {f})" for f in TEXT_FIELDS) +
                 " WHERE national_id = ?",
                 (v["full_name"], v["sex"], v["age"], v["house_name"], v["party"], v["phone"], v["location"],
                  v["full_name_dv"], v["house_name_dv"],
                  v["photo_path"],
-                 src, stamp, nid),
+                 src, stamp, *(v.get(f, "") for f in TEXT_FIELDS), nid),
             )
             counts["updated"] += 1
     return counts

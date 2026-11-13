@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% from "calls/_form.html" import call_form, call_history, voter_head with context %}
+{% block title %}Calls{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Calls</h1>
+  <p class="muted">Today: <strong>{{ today.calls }}</strong> call{{ 's' if today.calls != 1 }}, <strong>{{ today.reached }}</strong> reached.</p>
+</div>
+
+{% if no_islands %}
+<div class="empty card"><p>No island has been given to you yet. Ask the campaign admin to add you under <strong>Calls → Islands</strong>.</p></div>
+{% else %}
+
+{% if islands|length > 1 %}
+<div class="chips" aria-label="Island">
+  <a class="chip {{ 'on' if island is none }}" href="{{ url_for('calls.queue') }}">{{ 'All islands' if current_user.role == 'admin' else 'All my islands' }}</a>
+  {% for i in islands %}
+  <a class="chip {{ 'on' if island == i }}" href="{{ url_for('calls.queue', island=i or no_island) }}">{{ island_label(i) }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if counts %}
+<p class="queue-counts small-text">
+  {% if counts.due %}<span class="tag out-tag-callback">{{ counts.due }} call-back{{ 's' if counts.due != 1 }} due</span>{% endif %}
+  <span>{{ counts.never }} never tried</span> · <span>{{ counts.retry_now }} to try again{% if counts.retry_later %} (+{{ counts.retry_later }} later){% endif %}</span> · <span>{{ counts.booked }} call-back{{ 's' if counts.booked != 1 }} booked</span>
+</p>
+{% endif %}
+
+{% if paused %}
+<div class="empty card">
+  <p>Paused. Nobody is being held for you.</p>
+  <a class="button primary big" href="{{ url_for('calls.queue', island=(island or no_island) if island is not none else None) }}">{{ icon('phone') }} Start calling</a>
+</div>
+{% elif voter %}
+<article class="card profile">
+  {{ voter_head(voter, island_label) }}
+  <p class="muted small-text">This voter is held for you for {{ hold_minutes }} minutes so nobody else calls them.</p>
+</article>
+{{ call_form(voter, outcomes, island=island, queue=true) }}
+<form method="post" action="{{ url_for('calls.release', national_id=voter.national_id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="link">Stop for now (give this voter back)</button>
+</form>
+{{ call_history(calls, outcomes) }}
+{% else %}
+<div class="empty card"><p>Nobody to call right now. {% if counts and (counts.retry_later or counts.booked) %}Voters to try again and booked call-backs come back here when it's time.{% else %}Everyone on your list has been called.{% endif %}</p></div>
+{% endif %}
+{% endif %}
+{% endblock %}

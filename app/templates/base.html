@@ -26,17 +26,26 @@
       <span>{{ campaign_name() }} <span class="brand-sub">voters</span></span>
     </a>
     <nav class="topnav" aria-label="Main">
-      {% if role == 'agent' %}
+      {% set cc = call_center_on() %}
+      {% if cc %}
+      <a href="{{ url_for('calls.queue') }}" {{ 'aria-current=page' if ep in ('calls.queue', 'calls.voter_page') }}>Calls</a>
+      {% if is_admin %}
+      <a href="{{ url_for('calls.dashboard') }}" {{ 'aria-current=page' if ep in ('calls.dashboard', 'calls.by_state') }}>Reachability</a>
+      <a href="{{ url_for('calls.comments') }}" {{ 'aria-current=page' if ep == 'calls.comments' }}>Comments</a>
+      <a href="{{ url_for('calls.islands') }}" {{ 'aria-current=page' if ep == 'calls.islands' }}>Islands</a>
+      {% endif %}
+      {% endif %}
+      {% if role == 'agent' and not cc %}
       <a href="{{ url_for('canvass.my_houses') }}" {{ 'aria-current=page' if ep == 'canvass.my_houses' }}>My dashboard</a>
       {% endif %}
       <a href="{{ url_for('voters.search') }}" {{ 'aria-current=page' if ep.startswith('voters.') and ep != 'voters.create' }}>Search</a>
-      {% if role == 'user' %}
+      {% if role == 'user' and not cc %}
       <a href="{{ url_for('canvass.my_houses') }}" {{ 'aria-current=page' if ep == 'canvass.my_houses' }}>My dashboard</a>
-      {% elif role == 'admin' %}
+      {% elif role == 'admin' and not cc %}
       <a href="{{ url_for('canvass.dashboard') }}" {{ 'aria-current=page' if ep == 'canvass.dashboard' }}>Dashboard</a>
       {% endif %}
       {% if is_admin %}
-      <a href="{{ url_for('canvass.agents') }}" {{ 'aria-current=page' if ep == 'canvass.agents' or (ep == 'canvass.my_houses') }}>Agents</a>
+      {% if not cc %}<a href="{{ url_for('canvass.agents') }}" {{ 'aria-current=page' if ep == 'canvass.agents' or (ep == 'canvass.my_houses') }}>Agents</a>{% endif %}
       <a href="{{ url_for('imports.index') }}" {{ 'aria-current=page' if ep.startswith('imports.') }}>Import</a>
       <a href="{{ url_for('admin.users') }}" {{ 'aria-current=page' if ep.startswith('admin.user') }}>Users</a>
       <a href="{{ url_for('campaign.settings') }}" {{ 'aria-current=page' if ep == 'campaign.settings' }}>Settings</a>
@@ -118,17 +127,23 @@
 
   {% if current_user %}
   <nav class="tabbar" aria-label="Main">
-    {% if role == 'agent' %}
+    {% set cc = call_center_on() %}
+    {% if cc %}
+    <a href="{{ url_for('calls.queue') }}" {{ 'aria-current=page' if ep in ('calls.queue', 'calls.voter_page') }}>{{ icon('phone') }}<span>Calls</span></a>
+    {% endif %}
+    {% if role == 'agent' and not cc %}
     <a href="{{ url_for('canvass.my_houses') }}" {{ 'aria-current=page' if ep == 'canvass.my_houses' }}>{{ icon('home') }}<span>My dashboard</span></a>
     {% endif %}
     <a href="{{ url_for('voters.search') }}" {{ 'aria-current=page' if ep.startswith('voters.') }}>{{ icon('search') }}<span>Search</span></a>
-    {% if role == 'user' %}
+    {% if role == 'user' and not cc %}
     <a href="{{ url_for('canvass.my_houses') }}" {{ 'aria-current=page' if ep == 'canvass.my_houses' }}>{{ icon('chart') }}<span>My dashboard</span></a>
     {% elif role == 'admin' %}
-    <a href="{{ url_for('canvass.dashboard') }}" {{ 'aria-current=page' if ep == 'canvass.dashboard' }}>{{ icon('chart') }}<span>Dashboard</span></a>
+    {% if cc %}<a href="{{ url_for('calls.dashboard') }}" {{ 'aria-current=page' if ep in ('calls.dashboard', 'calls.by_state', 'calls.comments') }}>{{ icon('chart') }}<span>Reach</span></a>
+    {% else %}<a href="{{ url_for('canvass.dashboard') }}" {{ 'aria-current=page' if ep == 'canvass.dashboard' }}>{{ icon('chart') }}<span>Dashboard</span></a>{% endif %}
     {% endif %}
     {% if is_admin %}
-    <a href="{{ url_for('canvass.agents') }}" {{ 'aria-current=page' if ep in ('canvass.agents', 'canvass.my_houses') }}>{{ icon('users') }}<span>Agents</span></a>
+    {% if cc %}<a href="{{ url_for('calls.islands') }}" {{ 'aria-current=page' if ep == 'calls.islands' }}>{{ icon('pin') }}<span>Islands</span></a>
+    {% else %}<a href="{{ url_for('canvass.agents') }}" {{ 'aria-current=page' if ep in ('canvass.agents', 'canvass.my_houses') }}>{{ icon('users') }}<span>Agents</span></a>{% endif %}
     <a href="{{ url_for('imports.index') }}" {{ 'aria-current=page' if ep.startswith('imports.') }}>{{ icon('upload') }}<span>Import</span></a>
     <a href="{{ url_for('admin.users') }}" {{ 'aria-current=page' if ep.startswith('admin.') }}>{{ icon('user') }}<span>Users</span></a>
     {% endif %}

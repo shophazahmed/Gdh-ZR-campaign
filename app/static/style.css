@@ -789,3 +789,25 @@ button.linklike { background: none; border: 0; padding: 0; color: var(--danger);
 .al-voter img, .al-nophoto { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex: none; background: var(--surface-2); }
 .al-nophoto { display: grid; place-items: center; color: var(--muted); }
 .al-voter .badge { flex: none; }
+
+/* --- call centre ------------------------------------------------------------ */
+.seg-refused { fill: #8e5bd6; background: #8e5bd6; }
+.seg-wrong { fill: var(--muted); background: var(--muted); }
+.seg-track-fill { fill: var(--track); }
+.outcomes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 720px) { .outcomes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.call-form .actions { flex-wrap: wrap; }
+.call-history { list-style: none; margin: 0; padding: 0; }
+.call-history li { padding: .6rem 0; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: .35rem .5rem; align-items: baseline; }
+.call-history li:last-child { border-bottom: 0; }
+.call-history li p { flex-basis: 100%; margin: .15rem 0 0; white-space: pre-wrap; word-break: break-word; }
+ol.call-history.card { padding: .25rem 1rem; }
+.out-tag-reached { background: var(--ok-bg); color: var(--ok-text); }
+.out-tag-refused, .out-tag-wrongnumber { background: var(--err-bg); color: var(--err-text); }
+.out-tag-callback { background: var(--info-bg); color: var(--info-text); }
+.daychart { width: 100%; height: auto; max-height: 220px; }
+.daychart text { font-size: 7px; fill: var(--muted); }
+.island-card .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .4rem; }
+a.kpi { color: inherit; text-decoration: none; }
+.island-meta { display: flex; flex-wrap: wrap; gap: .25rem .75rem; margin: .35rem 0 0; color: var(--muted); }
+.queue-counts { color: var(--muted); margin: 0 0 .75rem; }

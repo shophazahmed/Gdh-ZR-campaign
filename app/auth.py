@@ -238,6 +238,10 @@ def _safe_next(target, user=None):
 
 def home_url(user=None):
     user = user or g.get("user")
+    if user is not None and user["role"] in ("agent", "user"):
+        from .campaign import call_center_on
+        if call_center_on():
+            return url_for("calls.queue")
     if user is not None and user["role"] == "agent":
         return url_for("canvass.my_houses")
     return url_for("voters.search")

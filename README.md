@@ -1,4 +1,4 @@
-# GDh MG campaign: voter portal for many candidates
+# GDh ZR campaign: voter portal for many candidates
 
 A private, login-only voter list: search and filter voters, view photos, canvass, assign agents,
 and (for admins) edit records, export lists, manage users and read the activity log.
@@ -12,7 +12,7 @@ admin account**, so one campaign can never see another's voters.
 
 ```
                       ┌─► vp-gadhdhoo  (container) ─► volume vp-gadhdhoo_data  (database + photos)
-browser ──HTTPS──► Traefik ─► vp-gdh-mg    (container) ─► volume vp-gdh-mg_data
+browser ──HTTPS──► Traefik ─► vp-gdh-zr    (container) ─► volume vp-gdh-zr_data
   (Host: …)           └─► vp-<slug>    (container) ─► volume vp-<slug>_data
                      all built from the same image  vote-portal:<version>
 ```
@@ -460,7 +460,7 @@ Each candidate is one Docker Compose project (`vp-<slug>`) made from `deploy/can
 Every container, Traefik router, middleware and volume name includes the slug, so candidates never
 clash. `deploy/vp.sh` does all of it.
 
-**Naming:** slug = short lowercase name (`gadhdhoo`, `gdh-mg`); domain = `<slug>.vote.seenu.online`
+**Naming:** slug = short lowercase name (`gadhdhoo`, `gdh-zr`); domain = `<slug>.vote.seenu.online`
 (Gadhdhoo keeps `vote.seenu.online`). DNS: one wildcard record `*.vote.seenu.online  A  <VPS IP>`
 plus `vote.seenu.online  A  <VPS IP>`. Traefik answers only the domains it has a candidate for and gets a
 Let's Encrypt certificate for each one. Don't put Cloudflare's proxy (orange cloud) in front of the
@@ -469,7 +469,7 @@ two-level names unless you have a certificate that covers them.
 ### First time on the server
 
 ```bash
-git clone https://github.com/<owner>/Gdh-mg-campaign /opt/vote && cd /opt/vote
+git clone https://github.com/<owner>/Gdh-ZR-campaign /opt/vote && cd /opt/vote
 git tag                              # releases, e.g. v1.0
 ```
 
@@ -477,7 +477,7 @@ git tag                              # releases, e.g. v1.0
 
 ```bash
 cd /opt/vote
-deploy/vp.sh new gdh-mg mg.vote.seenu.online "GDh MG" v1.0
+deploy/vp.sh new gdh-zr zr.vote.seenu.online "GDh ZR" v1.0
 #  -> prints the URL and the one-time admin password (changed at first sign-in)
 ```
 
@@ -488,12 +488,12 @@ voter files on the **Import** page (see below; any file names work).
 
 ```bash
 deploy/vp.sh list                         # every candidate: domain, version, health
-deploy/vp.sh logs gdh-mg
-deploy/vp.sh flask gdh-mg create-user aisha --role user
-deploy/vp.sh flask gdh-mg set-password admin
-deploy/vp.sh ingest gdh-mg /root/gdh-mg-files      # import from the server instead of the web page
+deploy/vp.sh logs gdh-zr
+deploy/vp.sh flask gdh-zr create-user aisha --role user
+deploy/vp.sh flask gdh-zr set-password admin
+deploy/vp.sh ingest gdh-zr /root/gdh-zr-files      # import from the server instead of the web page
 deploy/vp.sh backup all                   # /var/backups/vote/<slug>/, newest 14 kept
-deploy/vp.sh stop gdh-mg                  # data is kept
+deploy/vp.sh stop gdh-zr                  # data is kept
 ```
 
 Nightly backups, copied off the server by your own sync:
@@ -507,7 +507,7 @@ Each candidate is pinned to a git tag, so pushing code never changes a live port
 git tag v1.1 && git push --tags           # on your PC, when a version is ready
 cd /opt/vote && git fetch --tags
 deploy/vp.sh upgrade demo v1.1            # try it on a demo candidate first
-deploy/vp.sh upgrade gdh-mg v1.1          # backs up, rebuilds, restarts; to go back: upgrade gdh-mg v1.0
+deploy/vp.sh upgrade gdh-zr v1.1          # backs up, rebuilds, restarts; to go back: upgrade gdh-zr v1.0
 ```
 
 ### Moving the live Gadhdhoo portal into this setup

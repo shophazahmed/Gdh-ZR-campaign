@@ -17,6 +17,7 @@
   </div>
   <div class="kpi"><span class="kpi-label">All my calls</span><strong>{{ me.calls_all }}</strong></div>
   <div class="kpi"><span class="kpi-label">Voters I reached</span><strong>{{ me.reached_all }}</strong></div>
+  <div class="kpi"><span class="kpi-label">Will vote</span><strong>{{ me.willvote_all }}</strong>{% if me.willnotvote_all %}<span class="muted">{{ me.willnotvote_all }} will not vote</span>{% endif %}</div>
   {% if counts %}
   <div class="kpi"><span class="kpi-label">Call-backs due</span><strong>{{ counts.due }}</strong></div>
   <div class="kpi"><span class="kpi-label">Never tried</span><strong>{{ counts.never }}</strong></div>
@@ -34,7 +35,7 @@
     </div>
     {{ reach_bar(r) }}
     <p class="island-meta small-text">
-      <span>{{ r.tried_pct }}% called</span><span>{{ r.never }} never tried</span>
+      <span>{{ r.tried_pct }}% called</span><strong>{{ r.willvote }} will vote</strong>{% if r.willnotvote %}<span>{{ r.willnotvote }} will not vote</span>{% endif %}<span>{{ r.never }} never tried</span>
       <span>{{ r.callback }} call-back{{ 's' if r.callback != 1 }}</span>
       {% if r.hard %}<span>{{ r.hard }} hard to reach</span>{% endif %}
       {% if r.wrongnumber %}<span>{{ r.wrongnumber }} wrong number</span>{% endif %}
@@ -44,7 +45,8 @@
   {% endfor %}
 </ul>
 <p class="legend" aria-hidden="true">
-  <span><i class="seg-contacted"></i>Reached</span><span><i class="seg-refused"></i>Refused</span>
+  <span><i class="seg-contacted"></i>Will vote</span><span><i class="seg-spoke"></i>Reached</span>
+  <span><i class="seg-against"></i>Will not vote</span><span><i class="seg-refused"></i>Refused</span>
   <span><i class="seg-followup"></i>Call back</span><span><i class="seg-noanswer"></i>Hard to reach</span>
   <span><i class="seg-wrong"></i>Wrong number</span>
 </p>

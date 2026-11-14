@@ -47,7 +47,7 @@ Each has **My dashboard**: their islands' progress, their calls today / this wee
 calls and comments.
 
 **Agents** sign in straight to **Calls**: the next voter of their islands, a **Call** button per number,
-then one tap for the outcome (**Reached · No answer · Switched off · Wrong number · Call back later ·
+then one tap for the outcome (**Will vote · Will not vote · Reached · No answer · Switched off · Wrong number · Call back later ·
 Refused**), a comment, and **Save and next**.
 - The voter on screen is held for that agent (10 min by default) so two agents never ring the same person.
 - *Call back later* takes a time; the voter comes back to the top of the list when it's due.

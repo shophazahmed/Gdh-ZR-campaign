@@ -28,6 +28,8 @@ from .normalize import clean_text, split_phones
 bp = Blueprint("calls", __name__, url_prefix="/calls")
 
 OUTCOMES = {
+    "willvote": "Will vote",
+    "willnotvote": "Will not vote",
     "reached": "Reached",
     "noanswer": "No answer",
     "switchedoff": "Switched off",
@@ -35,13 +37,18 @@ OUTCOMES = {
     "callback": "Call back later",
     "refused": "Refused",
 }
-FINAL = {"reached", "refused", "wrongnumber"}  # no more calls after these
+# Spoke to the voter: all three count as reached; the first two also record how they'll vote
+REACHED = ("reached", "willvote", "willnotvote")
+REACHED_SQL = "('reached', 'willvote', 'willnotvote')"
+FINAL = set(REACHED) | {"refused", "wrongnumber"}  # no more calls after these
 # Canvassing status each outcome sets (the existing chips: contacted / follow up / no answer)
-CANVASS_STATUS = {"reached": "contacted", "refused": "contacted", "callback": "followup",
+CANVASS_STATUS = {"reached": "contacted", "willvote": "contacted", "willnotvote": "contacted", "refused": "contacted", "callback": "followup",
                   "noanswer": "noanswer", "switchedoff": "noanswer", "wrongnumber": "noanswer"}
 STATES = {
     "never": "Never tried",
-    "reached": "Reached",
+    "reached": "Reached (all)",
+    "willvote": "Will vote",
+    "willnotvote": "Will not vote",
     "refused": "Refused",
     "wrongnumber": "Wrong number",
     "callback": "Call back booked",
@@ -251,7 +258,7 @@ def queue_counts(user):
 
 def my_today(user):
     row = get_db().execute(
-        "SELECT COUNT(*) AS calls, SUM(outcome = 'reached') AS reached FROM calls WHERE user_id = ? AND at >= ?",
+        "SELECT COUNT(*) AS calls, SUM(outcome IN ('reached', 'willvote', 'willnotvote')) AS reached FROM calls WHERE user_id = ? AND at >= ?",
         (user["id"], _local_midnight_utc(0))).fetchone()
     return {"calls": row["calls"] or 0, "reached": row["reached"] or 0}
 
@@ -449,7 +456,8 @@ def island_stats(islands=None):
     w, p = _scope(where, params)
     rows = get_db().execute(
         f"SELECT island, COUNT(*) AS total, SUM(st != 'nophone') AS with_phone, SUM(st = 'nophone') AS nophone,"
-        " SUM(tried) AS tried, SUM(st = 'reached') AS reached, SUM(st = 'refused') AS refused,"
+        f" SUM(tried) AS tried, SUM(st IN {REACHED_SQL}) AS reached, SUM(st = 'willvote') AS willvote,"
+        " SUM(st = 'willnotvote') AS willnotvote, SUM(st = 'refused') AS refused,"
         " SUM(st = 'wrongnumber') AS wrongnumber, SUM(st = 'hard') AS hard, SUM(st IN ('callback', 'due')) AS callback,"
         " SUM(st = 'due') AS due, SUM(st = 'never') AS never, SUM(st = 'trying') AS trying"
         f" FROM (SELECT v.island AS island, {state} AS st, COALESCE(s.attempts, 0) > 0 AS tried"
@@ -459,9 +467,12 @@ def island_stats(islands=None):
     for r in rows:
         d = {k: (r[k] or 0) if k != "island" else r[k] for k in r.keys()}
         d["pct"] = round(100 * d["reached"] / d["total"]) if d["total"] else 0
+        d["spoke"] = d["reached"] - d["willvote"] - d["willnotvote"]   # reached, intent not recorded
         d["tried_pct"] = round(100 * d["tried"] / d["total"]) if d["total"] else 0
         out.append(d)
     total = {k: sum(r[k] for r in out) for k in out[0] if k not in ("island", "pct", "tried_pct")} if out else {}
+    for d in out + ([total] if total else []):
+        d["vote_pct"] = round(100 * d["willvote"] / d["reached"]) if d["reached"] else 0
     if total:
         total["pct"] = round(100 * total["reached"] / total["total"]) if total["total"] else 0
         total["tried_pct"] = round(100 * total["tried"] / total["total"]) if total["total"] else 0
@@ -480,8 +491,8 @@ def agent_stats():
         "SELECT u.id, u.username, u.is_active,"
         " (SELECT GROUP_CONCAT(CASE WHEN island = '' THEN 'No island' ELSE island END, ', ')"
         "    FROM island_agents ia WHERE ia.user_id = u.id) AS islands,"
-        " SUM(c.at >= ?) AS calls_today, SUM(c.at >= ? AND c.outcome = 'reached') AS reached_today,"
-        " SUM(c.at >= ?) AS calls_week, SUM(c.at >= ? AND c.outcome = 'reached') AS reached_week,"
+        " SUM(c.at >= ?) AS calls_today, SUM(c.at >= ? AND c.outcome IN ('reached', 'willvote', 'willnotvote')) AS reached_today,"
+        " SUM(c.at >= ?) AS calls_week, SUM(c.at >= ? AND c.outcome IN ('reached', 'willvote', 'willnotvote')) AS reached_week,"
         " COUNT(c.id) AS calls_all, MAX(c.at) AS last_at"
         " FROM users u LEFT JOIN calls c ON c.user_id = u.id"
         " WHERE u.deleted_at IS NULL AND (u.id IN (SELECT user_id FROM island_agents) OR u.id IN (SELECT user_id FROM calls))"
@@ -492,7 +503,7 @@ def agent_stats():
 def daily(days=14):
     start = _local_midnight_utc(days - 1)
     rows = dict((r[0], (r[1], r[2])) for r in get_db().execute(
-        "SELECT date(at, '+5 hours') AS day, COUNT(*), SUM(outcome = 'reached') FROM calls WHERE at >= ?"
+        "SELECT date(at, '+5 hours') AS day, COUNT(*), SUM(outcome IN ('reached', 'willvote', 'willnotvote')) FROM calls WHERE at >= ?"
         " GROUP BY day", (start,)))
     today = (datetime.now(timezone.utc) + LOCAL_OFFSET).date()
     out = []
@@ -530,9 +541,10 @@ def mine():
     db = get_db()
     today, week = _local_midnight_utc(0), _local_midnight_utc(6)
     me = db.execute(
-        "SELECT SUM(at >= ?) AS calls_today, SUM(at >= ? AND outcome = 'reached') AS reached_today,"
-        " SUM(at >= ?) AS calls_week, SUM(at >= ? AND outcome = 'reached') AS reached_week,"
-        " COUNT(*) AS calls_all, SUM(outcome = 'reached') AS reached_all FROM calls WHERE user_id = ?",
+        "SELECT SUM(at >= ?) AS calls_today, SUM(at >= ? AND outcome IN ('reached', 'willvote', 'willnotvote')) AS reached_today,"
+        " SUM(at >= ?) AS calls_week, SUM(at >= ? AND outcome IN ('reached', 'willvote', 'willnotvote')) AS reached_week,"
+        " COUNT(*) AS calls_all, SUM(outcome IN ('reached', 'willvote', 'willnotvote')) AS reached_all,"
+        " SUM(outcome = 'willvote') AS willvote_all, SUM(outcome = 'willnotvote') AS willnotvote_all FROM calls WHERE user_id = ?",
         (today, today, week, week, user["id"])).fetchone()
     recent = db.execute(
         "SELECT c.*, v.full_name, v.island FROM calls c JOIN voters v ON v.national_id = c.national_id"
@@ -661,8 +673,9 @@ def by_state():
         " (SELECT comment FROM calls c WHERE c.national_id = v.national_id AND c.comment != ''"
         "  ORDER BY c.at DESC LIMIT 1) AS last_comment"
         f" FROM voters v LEFT JOIN call_state s ON s.national_id = v.national_id{where})"
-        " WHERE st = ? ORDER BY island COLLATE NOCASE, house_name COLLATE NOCASE, full_name COLLATE NOCASE",
-        params + [state]).fetchall()
+        f" WHERE {'st IN ' + REACHED_SQL if state == 'reached' else 'st = ?'}"
+        " ORDER BY island COLLATE NOCASE, house_name COLLATE NOCASE, full_name COLLATE NOCASE",
+        params + ([] if state == "reached" else [state])).fetchall()
     if request.args.get("format") == "csv":
         out = io.StringIO()
         w = csv.writer(out)

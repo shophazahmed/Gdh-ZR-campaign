@@ -83,7 +83,7 @@
 <svg class="pbar {{ size }}" viewBox="0 0 100 10" preserveAspectRatio="none" role="img"
      aria-label="{{ r.reached or 0 }} of {{ total }} reached">
   {%- if total %}{% set ns = namespace(x=0) %}
-  {%- for key, cls, label in [('reached', 'seg-contacted', 'Reached'), ('refused', 'seg-refused', 'Refused'), ('callback', 'seg-followup', 'Call back'), ('hard', 'seg-noanswer', 'Hard to reach'), ('wrongnumber', 'seg-wrong', 'Wrong number')] %}
+  {%- for key, cls, label in [('willvote', 'seg-contacted', 'Will vote'), ('spoke', 'seg-spoke', 'Reached'), ('willnotvote', 'seg-against', 'Will not vote'), ('refused', 'seg-refused', 'Refused'), ('callback', 'seg-followup', 'Call back'), ('hard', 'seg-noanswer', 'Hard to reach'), ('wrongnumber', 'seg-wrong', 'Wrong number')] %}
   {%- set n = r[key] or 0 %}
   {%- if n %}{% set w = 100 * n / total %}<rect class="{{ cls }}" x="{{ ns.x|round(3) }}" y="0" width="{{ w|round(3) }}" height="10"><title>{{ label }}: {{ n }} of {{ total }}</title></rect>{% set ns.x = ns.x + w %}{% endif %}
   {%- endfor %}

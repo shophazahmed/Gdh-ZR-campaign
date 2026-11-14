@@ -13,15 +13,16 @@
   <div class="kpi hero">
     <span class="kpi-label">Voters reached</span>
     <strong>{{ total.pct }}%</strong>
-    <span class="muted">{{ total.reached }} of {{ total.total }} · {{ total.tried_pct }}% called at least once</span>
+    <span class="muted">{{ total.reached }} of {{ total.total }} · {{ total.tried_pct }}% called at least once · {{ total.willvote }} will vote ({{ total.vote_pct }}% of reached)</span>
     {{ reach_bar(total, 'lg') }}
   </div>
-  {% for key, label in [('reached', 'Reached'), ('refused', 'Refused'), ('callback', 'Call-backs booked'), ('due', 'Call-backs due now'), ('hard', 'Hard to reach'), ('wrongnumber', 'Wrong number'), ('never', 'Never tried'), ('nophone', 'No phone number')] %}
+  {% for key, label in [('willvote', 'Will vote'), ('willnotvote', 'Will not vote'), ('reached', 'Reached (all)'), ('refused', 'Refused'), ('callback', 'Call-backs booked'), ('due', 'Call-backs due now'), ('hard', 'Hard to reach'), ('wrongnumber', 'Wrong number'), ('never', 'Never tried'), ('nophone', 'No phone number')] %}
   <a class="kpi" href="{{ url_for('calls.by_state', state='callback' if key == 'callback' else key) }}"><span class="kpi-label">{{ label }}</span><strong>{{ total[key] }}</strong></a>
   {% endfor %}
 </section>
 <p class="legend" aria-hidden="true">
-  <span><i class="seg-contacted"></i>Reached</span><span><i class="seg-refused"></i>Refused</span>
+  <span><i class="seg-contacted"></i>Will vote</span><span><i class="seg-spoke"></i>Reached</span>
+  <span><i class="seg-against"></i>Will not vote</span><span><i class="seg-refused"></i>Refused</span>
   <span><i class="seg-followup"></i>Call back</span><span><i class="seg-noanswer"></i>Hard to reach</span>
   <span><i class="seg-wrong"></i>Wrong number</span><span><i class="seg-track"></i>Not yet</span>
 </p>
@@ -38,6 +39,8 @@
     {{ reach_bar(r) }}
     <p class="island-meta small-text">
       <span>{{ r.tried_pct }}% called</span>
+      <a href="{{ url_for('calls.by_state', state='willvote', island=isl) }}"><strong>{{ r.willvote }} will vote</strong></a>
+      {% if r.willnotvote %}<a href="{{ url_for('calls.by_state', state='willnotvote', island=isl) }}">{{ r.willnotvote }} will not vote</a>{% endif %}
       <a href="{{ url_for('calls.by_state', state='never', island=isl) }}">{{ r.never }} never tried</a>
       <a href="{{ url_for('calls.by_state', state='callback', island=isl) }}">{{ r.callback }} call-back{{ 's' if r.callback != 1 }}</a>
       {% if r.due %}<a class="tag" href="{{ url_for('calls.by_state', state='due', island=isl) }}">{{ r.due }} due now</a>{% endif %}

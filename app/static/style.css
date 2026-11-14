@@ -811,3 +811,9 @@ ol.call-history.card { padding: .25rem 1rem; }
 a.kpi { color: inherit; text-decoration: none; }
 .island-meta { display: flex; flex-wrap: wrap; gap: .25rem .75rem; margin: .35rem 0 0; color: var(--muted); }
 .queue-counts { color: var(--muted); margin: 0 0 .75rem; }
+.seg-spoke { fill: var(--st-contacted); opacity: .45; background: var(--st-contacted); }
+.seg-against { fill: #c2410c; background: #c2410c; }
+.out-tag-willvote { background: var(--ok-bg); color: var(--ok-text); font-weight: 700; }
+.out-tag-willnotvote { background: var(--err-bg); color: var(--err-text); font-weight: 700; }
+.outcomes .out-willvote span { border-color: var(--st-contacted); }
+.outcomes .out-willnotvote span { border-color: #c2410c; }

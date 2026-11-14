@@ -280,3 +280,28 @@ def test_my_dashboard(app):
     assert "will come to vote" in page and "bob's note" not in page
     assert "Fares-Maathoda" not in page.split("My islands")[1].split("My latest calls")[0]
     assert c.get("/calls/mine").status_code == 302          # the admin has the full dashboard
+
+
+def test_will_vote_and_will_not_vote(app):
+    ali = add_agent(app, "ali")
+    c = admin(app)
+    turn_on(c)
+    give_island(c, "Thinadhoo", ali)
+    a = agent_client(app, "ali")
+    page = a.get("/calls/").get_data(as_text=True)
+    assert 'value="willvote"' in page and 'value="willnotvote"' in page
+    log(a, "A300001", "willvote", "with family")
+    log(a, "A300002", "willnotvote")
+    assert held(a) is None                          # both finished
+    conn = db(app)
+    assert conn.execute("SELECT status FROM voters WHERE national_id = 'A300001'").fetchone()[0] == "contacted"
+    dash = c.get("/calls/dashboard").get_data(as_text=True)
+    assert "100%" in dash                           # both Thinadhoo voters count as reached
+    assert "1 will vote" in dash and "1 will not vote" in dash
+    lst = c.get("/calls/voters?state=willvote&island=Thinadhoo").get_data(as_text=True)
+    assert "Ahmed One" in lst and "Aishath Two" not in lst
+    reached = c.get("/calls/voters?state=reached&island=Thinadhoo").get_data(as_text=True)
+    assert "Ahmed One" in reached and "Aishath Two" in reached
+    assert "with family" in c.get("/calls/comments?outcome=willvote").get_data(as_text=True)
+    mine = a.get("/calls/mine").get_data(as_text=True)
+    assert "1 will vote" in mine
